@@ -1,6 +1,6 @@
-FrameScope——帧析云鉴系统
-砖业团队
-一句话口号：读懂视频，做对决策。
+# FrameScope——帧析云鉴系统
+### 砖业团队
+### 一句话口号：读懂视频，做对决策。
 项目简介：
 在抖音生态中，优质视频蕴含着海量信息，但用户面临理解成本高、吸收效率低、观点冲突多的痛点。FrameScope——帧析云鉴系统 通过 AI 深度读懂内容并重构表达，将碎片化的视频流转化为结构化、可验证的深度研报，让内容从“被观看”真正走向“被使用”。
 1. 业务背景与痛点 (Market Context)
@@ -29,7 +29,7 @@ FrameScope——帧析云鉴系统
 - 文本模型qwen、STT使用whisper或groq
 3.2 graph的结构组成
 1. url_search_node视频url搜索节点（questions）
-  - brave搜索api
+  - Tavily MCP
   - ReAct范式llm进行视频过滤和url规则筛选
   Return （多个视频url）
 2. note_generation_node单视频总结生成节点（多个视频url）

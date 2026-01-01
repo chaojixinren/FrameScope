@@ -1,0 +1,15 @@
+"""
+Prompts 模块
+统一管理所有 Agent 的提示词
+"""
+
+from .video_search_prompts import VIDEO_SEARCH_SYSTEM_PROMPT, VIDEO_SEARCH_USER_PROMPT_TEMPLATE
+from .summary_prompts import SUMMARY_SYSTEM_PROMPT, SUMMARY_USER_PROMPT_TEMPLATE
+
+__all__ = [
+    "VIDEO_SEARCH_SYSTEM_PROMPT",
+    "VIDEO_SEARCH_USER_PROMPT_TEMPLATE",
+    "SUMMARY_SYSTEM_PROMPT",
+    "SUMMARY_USER_PROMPT_TEMPLATE",
+]
+

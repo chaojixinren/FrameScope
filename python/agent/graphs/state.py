@@ -1,0 +1,35 @@
+from typing import TypedDict, Optional, List, Dict, Any
+
+
+class AIState(TypedDict):
+    """多视频搜索和总结功能的状态定义"""
+    # User input
+    question: str
+    
+    # User information
+    user_id: Optional[int]
+
+    # Metadata
+    timestamp: Optional[str]
+    session_id: Optional[str]
+
+    # Context memory
+    history: List[Dict[str, Any]]  # 对话历史 [{"role": "user"/"assistant"/"system", "content": str}, ...]
+    answer: Optional[str]          # 最近一次助手回复
+    
+    # 视频搜索相关（多视频功能）
+    video_urls: Optional[List[Dict[str, Any]]]  # [{"url": "...", "platform": "...", "title": "...", "popularity_score": float}]
+    search_query: Optional[str]  # Agent1 生成的搜索查询
+    
+    # 笔记生成相关（多视频功能）
+    note_results: Optional[List[Dict[str, Any]]]  # 每个视频的笔记结果
+    model_name: Optional[str]  # 从配置获取
+    provider_id: Optional[str]  # 从配置获取
+    note_generation_status: Optional[Dict[str, str]]  # 每个任务的状态（可选）
+    
+    # 总结相关（多视频功能）
+    summary_result: Optional[str]  # 最终总结
+    
+    # 元数据（多视频功能）
+    metadata: Optional[Dict[str, Any]]  # 元数据 {"total_videos": int, "processing_time": float}
+
