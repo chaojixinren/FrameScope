@@ -229,6 +229,33 @@ class NoteGenerator:
         :param provider_id: 供应商 ID
         :return: GPT 实例
         """
+        # 如果 model_name 或 provider_id 为 None，使用默认配置（优先 qwen）
+        if not model_name or not provider_id:
+            try:
+                # 尝试从 agent.utils.config_helper 导入（如果可用）
+                import sys
+                from pathlib import Path
+                # 获取当前文件的路径：python/app/services/note.py
+                # agent 路径应该是：python/agent
+                current_file = Path(__file__)  # python/app/services/note.py
+                agent_path = current_file.parent.parent.parent / "agent"  # python/agent
+                if str(agent_path) not in sys.path:
+                    sys.path.insert(0, str(agent_path))
+                
+                from utils.config_helper import get_default_model_config
+                default_model_name, default_provider_id = get_default_model_config()
+                model_name = model_name or default_model_name
+                provider_id = provider_id or default_provider_id
+                logger.info(f"[get_gpt] 使用默认配置: model_name={model_name}, provider_id={provider_id}")
+            except Exception as e:
+                logger.warning(f"[get_gpt] 获取默认配置失败: {e}，将尝试使用传入的参数")
+                # 如果获取默认配置失败，且参数仍为 None，则抛出错误
+                if not model_name or not provider_id:
+                    raise ProviderError(
+                        code=ProviderErrorEnum.WRONG_PARAMETER.code,
+                        message=f"模型配置缺失：model_name={model_name}, provider_id={provider_id}，且无法获取默认配置"
+                    )
+        
         provider = ProviderService.get_provider_by_id(provider_id)
         if not provider:
             logger.error(f"[get_gpt] 未找到模型供应商: provider_id={provider_id}")
@@ -255,7 +282,8 @@ class NoteGenerator:
                 message=f"提供商 {provider_name} 的 API Key 是占位符，请替换为真实的 API Key"
             )
         
-        logger.info(f"创建 GPT 实例 {provider_id}, 模型: {model_name}, API Key 长度: {len(api_key)}")
+        provider_name = provider.get("name", provider_id)
+        logger.info(f"[get_gpt] 创建 GPT 实例 - 提供商: {provider_name} ({provider_id}), 模型: {model_name}, Base URL: {provider.get('base_url', 'N/A')}, API Key 长度: {len(api_key)}")
         config = ModelConfig(
             api_key=api_key,
             base_url=provider["base_url"],
@@ -263,7 +291,9 @@ class NoteGenerator:
             provider=provider["type"],
             name=provider["name"],
         )
-        return GPTFactory().from_config(config)
+        gpt_instance = GPTFactory().from_config(config)
+        logger.info(f"[get_gpt] ✓ GPT 实例创建成功 - 提供商: {provider_name} ({provider_id}), 模型: {model_name}")
+        return gpt_instance
 
     def _get_downloader(self, platform: str) -> Downloader:
         """
