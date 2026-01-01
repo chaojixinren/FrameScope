@@ -192,6 +192,7 @@ async def run_multi_video_query(
     # 处理对话历史
     history = []
     current_conversation_id = conversation_id
+    previous_summary = None  # 用于存储之前的视频总结
     
     if conversation_id:
         # 加载历史消息
@@ -201,6 +202,17 @@ async def run_multi_video_query(
             for msg in messages
         ]
         logger.info(f"加载对话历史: conversation_id={conversation_id}, 消息数={len(history)}")
+        
+        # 从历史消息中提取第一次的总结（通常是第一条 assistant 消息，包含完整的视频总结）
+        # 查找第一条 assistant 消息，如果它看起来像视频总结（包含关键帧、视频链接等），就作为 previous_summary
+        for msg in messages:
+            if msg.role == "assistant":
+                content = msg.content
+                # 判断是否是视频总结：包含关键帧图片链接或视频链接
+                if "![关键帧" in content or "查看原片" in content or "bilibili.com/video" in content:
+                    previous_summary = content
+                    logger.info(f"从历史消息中提取到之前的视频总结（长度: {len(content)} 字符）")
+                    break
     else:
         # 创建新对话（标题暂为空，后续自动生成）
         conversation = create_conversation(user_id=user_id, title="")
@@ -223,7 +235,7 @@ async def run_multi_video_query(
         "model_name": model_name,
         "provider_id": provider_id,
         "note_generation_status": None,
-        "summary_result": None,
+        "summary_result": previous_summary,  # 如果是后续提问，这里会包含之前的总结
         "answer": None,
         "metadata": None,
         "trace_data": None,
