@@ -65,3 +65,6 @@ note_results/
 data/
 
 *.db
+
+# Static files
+python/static/

@@ -204,7 +204,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import type { Message } from '@/api/conversation'
-import { multiVideoApi, type MultiVideoResponse } from '@/api/multi_video'
+import { multiVideoApi } from '@/api/multi_video'
 import { marked } from 'marked'
 
 // 配置marked选项
@@ -324,6 +324,27 @@ const formatAnswer = (answer: string) => {
   try {
     let html = marked.parse(answer) as string
     
+    // 解析后，清理表格单元格中的 "---" 文本内容
+    // 这是因为 LLM 可能将空单元格写成 "---"（表格分隔符），导致显示问题
+    if (typeof document !== 'undefined') {
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = html
+      
+      // 查找所有表格单元格（不包括表头）
+      const cells = tempDiv.querySelectorAll('td')
+      cells.forEach((cell) => {
+        const text = cell.textContent || ''
+        // 如果单元格内容只有 "---" 或类似的分隔符（至少2个连字符），清空它
+        if (text.trim().match(/^-{2,}$/)) {
+          cell.textContent = ''
+          // 添加一个非断行空格，确保单元格仍然可见
+          cell.innerHTML = '&nbsp;'
+        }
+      })
+      
+      html = tempDiv.innerHTML
+    }
+    
     // 处理图片URL：将后端的绝对URL转换为可访问的相对路径
     // 后端生成的URL格式可能有问题：http://127.0.0.1:8000:8483/static/screenshots/xxx.jpg（两个端口）
     // 正常格式：http://localhost:8483/static/screenshots/xxx.jpg
@@ -349,71 +370,10 @@ const formatAnswer = (answer: string) => {
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = html
       
-      // 查找所有包含"查看原片"或"原片"的链接
+      // 查找所有包含"查看原片"的链接
       const viewLinks = tempDiv.querySelectorAll('a')
-      let linkIndex = 0 // 用于记录链接顺序，作为视频编号的备选方案
       viewLinks.forEach((link) => {
-        const originalText = link.textContent || ''
-        const shouldProcessImage = originalText.includes('查看原片') || originalText.includes('原片')
-        
-        // 只处理包含"查看原片"或"原片"的链接
-        if (shouldProcessImage) {
-          // 匹配"查看原片 @ 12:34"或"原片 @ 12:34"格式（时间格式：mm:ss，两位分钟和两位秒）
-          const match = originalText.match(/(?:查看原片|原片)\s*@\s*(\d{2}:\d{2})/)
-          if (match) {
-            const timePart = match[1] // 例如 "12:34"
-            // 从链接的href中提取视频ID，或根据链接顺序确定视频编号
-            let videoNumber = 1 // 默认视频编号
-            const href = link.getAttribute('href') || ''
-            // 尝试从href中提取视频ID（B站视频链接格式：https://www.bilibili.com/video/BVxxx 或 /video/BVxxx）
-            const videoIdMatch = href.match(/video\/(BV\w+)/)
-            if (videoIdMatch && videoIdMatch[1] && currentVideoIds.value.length > 0) {
-              const videoId = videoIdMatch[1]
-              const index = currentVideoIds.value.indexOf(videoId)
-              if (index !== -1) {
-                videoNumber = index + 1
-              } else {
-                // 如果找不到匹配的视频ID，使用链接顺序（但不超过视频数量）
-                linkIndex++
-                videoNumber = Math.min(linkIndex, currentVideoIds.value.length) || 1
-              }
-            } else if (currentVideoIds.value.length > 0) {
-              // 如果无法从href提取视频ID，使用链接顺序
-              linkIndex++
-              videoNumber = Math.min(linkIndex, currentVideoIds.value.length) || 1
-            } else {
-              linkIndex++
-              videoNumber = linkIndex
-            }
-            // 替换链接文本为"视频xx @ 时间"
-            link.textContent = `视频${videoNumber} @ ${timePart}`
-          } else if (originalText === '查看原片' || originalText === '原片') {
-            // 如果没有时间部分，也尝试替换
-            let videoNumber = 1
-            const href = link.getAttribute('href') || ''
-            const videoIdMatch = href.match(/video\/(BV\w+)/)
-            if (videoIdMatch && videoIdMatch[1] && currentVideoIds.value.length > 0) {
-              const videoId = videoIdMatch[1]
-              const index = currentVideoIds.value.indexOf(videoId)
-              if (index !== -1) {
-                videoNumber = index + 1
-              } else {
-                linkIndex++
-                videoNumber = Math.min(linkIndex, currentVideoIds.value.length) || 1
-              }
-            } else if (currentVideoIds.value.length > 0) {
-              linkIndex++
-              videoNumber = Math.min(linkIndex, currentVideoIds.value.length) || 1
-            } else {
-              linkIndex++
-              videoNumber = linkIndex
-            }
-            link.textContent = `视频${videoNumber}`
-          }
-        }
-        
-        // 继续处理图片相关逻辑（如果链接包含"查看原片"或"原片"）
-        if (shouldProcessImage) {
+        if (link.textContent && link.textContent.includes('查看原片')) {
           // 向前查找最近的图片（可能在同一个父元素或前一个兄弟元素中）
           let image: HTMLImageElement | null = null
           
@@ -470,101 +430,6 @@ const formatAnswer = (answer: string) => {
             link.setAttribute('data-image-src', imagePath)
             // 使用 CSS 变量来设置背景图片（通过内联样式）
             link.style.setProperty('--hover-image-url', `url('${imagePath}')`)
-            
-            // 查找图片前面的文字内容段落，将链接移动到那里
-            const imageParent = image.parentElement
-            const linkParent = link.parentElement
-            
-            if (imageParent && linkParent) {
-              let targetParent: Element | null = null
-              
-              // 方法1：如果图片的段落中有文字内容（在图片前面），就在这个段落中插入链接
-              if (imageParent.tagName === 'P') {
-                const imageIndex = Array.from(imageParent.childNodes).indexOf(image)
-                const nodesBefore = Array.from(imageParent.childNodes).slice(0, imageIndex)
-                const hasTextBefore = nodesBefore.some(node => {
-                  if (node.nodeType === Node.TEXT_NODE) {
-                    return (node.textContent || '').trim().length > 0
-                  }
-                  if (node.nodeType === Node.ELEMENT_NODE) {
-                    const tagName = (node as Element).tagName
-                    return tagName !== 'IMG' && tagName !== 'BR'
-                  }
-                  return false
-                })
-                
-                if (hasTextBefore) {
-                  targetParent = imageParent
-                }
-              }
-              
-              // 方法2：查找图片段落的前一个兄弟元素（P、LI、DIV等）
-              if (!targetParent) {
-                let prevSibling = imageParent.previousElementSibling
-                while (prevSibling) {
-                  const tagName = prevSibling.tagName
-                  const textContent = (prevSibling.textContent || '').trim()
-                  
-                  // 检查是否有文字内容且不包含图片
-                  if (textContent.length > 0 && !prevSibling.querySelector('img')) {
-                    if (tagName === 'P' || tagName === 'LI' || tagName === 'DIV') {
-                      targetParent = prevSibling
-                      break
-                    }
-                  }
-                  prevSibling = prevSibling.previousElementSibling
-                }
-              }
-              
-              // 方法3：向上查找，在父元素的子节点中向前查找
-              if (!targetParent && imageParent.parentElement) {
-                const parent = imageParent.parentElement
-                const allChildren = Array.from(parent.children)
-                const imageParentIndex = allChildren.indexOf(imageParent)
-                
-                for (let i = imageParentIndex - 1; i >= 0; i--) {
-                  const sibling = allChildren[i]
-                  if (!sibling) continue
-                  
-                  const textContent = (sibling.textContent || '').trim()
-                  
-                  if (textContent.length > 0 && !sibling.querySelector('img')) {
-                    if (sibling.tagName === 'P' || sibling.tagName === 'LI') {
-                      targetParent = sibling
-                      break
-                    }
-                    // 如果内部有P或LI，使用内部的
-                    const innerP = sibling.querySelector('p, li')
-                    if (innerP && (innerP.textContent || '').trim().length > 0) {
-                      targetParent = innerP
-                      break
-                    }
-                  }
-                }
-              }
-              
-              // 如果找到了目标段落，将链接移动到那里
-              if (targetParent && linkParent !== targetParent) {
-                // 在目标段落末尾添加一个空格和链接
-                const spaceNode = document.createTextNode(' ')
-                targetParent.appendChild(spaceNode)
-                targetParent.appendChild(link)
-                
-                // 删除原来的链接段落（如果现在为空）
-                if (linkParent.tagName === 'P' || linkParent.tagName === 'LI') {
-                  const remainingNodes = Array.from(linkParent.childNodes).filter(node => node !== link)
-                  const hasContent = remainingNodes.some(node => {
-                    if (node.nodeType === Node.TEXT_NODE) {
-                      return (node.textContent || '').trim().length > 0
-                    }
-                    return true
-                  })
-                  if (!hasContent) {
-                    linkParent.remove()
-                  }
-                }
-              }
-            }
           }
         }
       })
@@ -640,26 +505,17 @@ const sendQuestion = async () => {
       conversationStore.addMessage(userMessage)
     }
 
-    let response: MultiVideoResponse
+    // 使用example目录下的默认视频ID列表
+    const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
+    // 保存视频ID列表
+    currentVideoIds.value = defaultVideoIds
     
-    if (isFirstAnswer) {
-      // 第一次回答：使用 example_video 接口（使用example目录下的视频）
-      const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
-      // 保存视频ID列表
-      currentVideoIds.value = defaultVideoIds
-      
-      response = await multiVideoApi.queryExample({
-        question: currentInput,
-        video_ids: defaultVideoIds,
-        conversation_id: targetConversationId
-      })
-    } else {
-      // 后续对话：使用 multi_video 接口（根据上下文进行正常对话）
-      response = await multiVideoApi.query({
-        question: currentInput,
-        conversation_id: targetConversationId
-      })
-    }
+    // 调用后端 API - 使用 example_video 接口（后端会保存用户消息和AI回复）
+    const response = await multiVideoApi.queryExample({
+      question: currentInput,
+      video_ids: defaultVideoIds,
+      conversation_id: targetConversationId
+    })
 
     // 第一次回答时，只添加AI回复到本地（用户消息已由后端保存，不在前端显示）
     // 后续对话时，用户消息已在上面的if中添加，这里添加AI回复
