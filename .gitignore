@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+python/example/
 
 # Virtual Environment
 venv/
@@ -62,3 +63,5 @@ Thumbs.db
 
 note_results/
 data/
+
+*.db

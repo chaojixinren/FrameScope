@@ -5,7 +5,7 @@ import re
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -28,7 +28,7 @@ from ffmpeg_helper import ensure_ffmpeg_or_raise
 agent_path = Path(__file__).parent / "agent"
 sys.path.insert(0, str(agent_path))
 
-from agent.graphs.agent_graph import build_multi_video_graph
+from agent.graphs.agent_graph import build_multi_video_graph, build_example_video_graph
 from agent.graphs.state import AIState
 from app.db.conversation_dao import create_conversation, get_conversation_by_id, update_conversation_title
 from app.db.message_dao import create_message, get_messages_by_conversation_id
@@ -36,6 +36,7 @@ from app.utils.conversation_helper import generate_conversation_title
 from app.dependencies.auth import get_current_user
 from app.db.models.user import User
 from fastapi import Depends
+from app.utils.response import ResponseWrapper as R
 
 # 为了向后兼容，保留 MultiVideoState 作为 AIState 的别名
 MultiVideoState = AIState
@@ -133,6 +134,34 @@ class MultiVideoResponse(BaseModel):
     success: bool
     answer: str
     metadata: Optional[Dict[str, Any]] = None  # 包含视频数量、处理时间等信息
+
+
+class ExampleVideoRequest(BaseModel):
+    """示例视频处理请求模型"""
+    question: str = Field(..., min_length=1, max_length=5000, description="用户问题（例如：这些视频的内容是什么）")
+    video_ids: List[str] = Field(..., min_length=1, description="视频ID列表（例如：['BV1Dk4y1X71E', 'BV1JD4y1z7vc']）")
+    session_id: Optional[str] = Field(None, max_length=255, description="会话ID")
+    conversation_id: Optional[int] = Field(None, description="对话ID（可选，如果提供则加载历史消息）")
+    model_name: Optional[str] = Field(None, description="GPT 模型名称（可选，不提供则使用默认）")
+    provider_id: Optional[str] = Field(None, description="提供商 ID（可选，不提供则使用默认）")
+    
+    @field_validator('question')
+    @classmethod
+    def validate_question(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("问题不能为空")
+        return v.strip()
+    
+    @field_validator('video_ids')
+    @classmethod
+    def validate_video_ids(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("视频ID列表不能为空")
+        # 验证视频ID格式（B站BV号）
+        for video_id in v:
+            if not re.match(r'^BV[0-9A-Za-z]+$', video_id):
+                raise ValueError(f"无效的视频ID格式: {video_id}，应为BV号（如BV1Dk4y1X71E）")
+        return v
 
 
 async def run_multi_video_query(
@@ -258,7 +287,7 @@ async def run_multi_video_query(
     return result
 
 
-@app.post("/api/multi_video", response_model=MultiVideoResponse)
+@app.post("/api/multi_video")
 async def multi_video_endpoint(
     request: MultiVideoRequest,
     current_user: User = Depends(get_current_user)
@@ -300,26 +329,195 @@ async def multi_video_endpoint(
         if not answer:
             answer = "抱歉，暂时无法生成总结内容。"
         
-        # 返回标准化的响应
-        return MultiVideoResponse(
+        # 返回标准化的响应（使用ResponseWrapper以匹配前端期望的格式）
+        response_data = MultiVideoResponse(
             success=True,
             answer=answer,
             metadata=metadata
         )
+        return R.success(data=response_data.model_dump())
         
     except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"输入验证失败: {str(e)}"
-        )
+        return R.error(code=400, msg=f"输入验证失败: {str(e)}")
     except Exception as e:
         error_detail = str(e)
         logger.error(f"Error in multi_video_endpoint: {error_detail}")
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"处理失败: {error_detail}"
+        return R.error(code=500, msg=f"处理失败: {error_detail}")
+
+
+async def run_example_video_query(
+    question: str,
+    video_ids: List[str],
+    user_id: int,
+    session_id: str = None,
+    conversation_id: Optional[int] = None,
+    model_name: str = None,
+    provider_id: str = None,
+) -> MultiVideoState:
+    """
+    运行示例视频处理查询（使用example目录下的视频）
+    
+    Args:
+        question: 用户问题
+        video_ids: 视频ID列表
+        user_id: 用户ID
+        session_id: 会话ID（可选）
+        conversation_id: 对话ID（可选，如果提供则加载历史消息）
+        model_name: 模型名称（可选）
+        provider_id: 提供商ID（可选）
+        
+    Returns:
+        MultiVideoState: 包含答案、笔记结果等信息的最终状态
+    """
+    if session_id is None:
+        session_id = str(uuid.uuid4())
+    
+    # 处理对话历史
+    history = []
+    current_conversation_id = conversation_id
+    
+    if conversation_id:
+        # 加载历史消息
+        messages = get_messages_by_conversation_id(conversation_id)
+        history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in messages
+        ]
+        logger.info(f"加载对话历史: conversation_id={conversation_id}, 消息数={len(history)}")
+    else:
+        # 创建新对话（标题暂为空，后续自动生成）
+        conversation = create_conversation(user_id=user_id, title="")
+        current_conversation_id = conversation.id
+        logger.info(f"创建新对话: conversation_id={current_conversation_id}")
+    
+    # Build graph（使用example视频图）
+    graph = build_example_video_graph()
+    
+    # Initialize state
+    initial_state: MultiVideoState = {
+        "question": question,
+        "user_id": user_id,
+        "session_id": session_id,
+        "history": history,
+        "timestamp": None,
+        "video_urls": [],  # example模式下不需要
+        "video_ids": video_ids,  # 传入视频ID列表
+        "search_query": None,
+        "note_results": [],
+        "model_name": model_name,
+        "provider_id": provider_id,
+        "note_generation_status": None,
+        "summary_result": None,
+        "answer": None,
+        "metadata": None,
+        "trace_data": None,
+    }
+    
+    # Run graph (异步)
+    logger.info(f"Starting Example Video Graph - User ID: {user_id}, Conversation ID: {current_conversation_id}, Video IDs: {video_ids}")
+    
+    result = await graph.ainvoke(initial_state)
+    
+    # 保存消息到数据库
+    answer = result.get("answer", "")
+    if current_conversation_id and answer:
+        try:
+            # 保存用户消息
+            create_message(
+                user_id=user_id,
+                conversation_id=current_conversation_id,
+                role="user",
+                content=question
+            )
+            # 保存助手回复
+            create_message(
+                user_id=user_id,
+                conversation_id=current_conversation_id,
+                role="assistant",
+                content=answer
+            )
+            logger.info(f"消息已保存到对话: conversation_id={current_conversation_id}")
+            
+            # 如果对话标题为空，自动生成标题
+            conversation = get_conversation_by_id(current_conversation_id)
+            if conversation and not conversation.title:
+                try:
+                    title = await generate_conversation_title(
+                        question=question,
+                        answer=answer,
+                        model_name=model_name,
+                        provider_id=provider_id
+                    )
+                    update_conversation_title(current_conversation_id, title)
+                    logger.info(f"对话标题已生成: {title}")
+                except Exception as e:
+                    logger.error(f"生成对话标题失败: {e}")
+        except Exception as e:
+            logger.error(f"保存消息失败: {e}")
+            traceback.print_exc()
+    
+    return result
+
+
+@app.post("/api/example_video")
+async def example_video_endpoint(
+    request: ExampleVideoRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    处理示例视频处理请求的接口（需要认证）
+    
+    流程：
+    1. 直接从example目录读取指定视频ID的视频文件
+    2. 并发生成每个视频的笔记
+    3. Agent2 对多个笔记进行多角度总结
+    
+    Args:
+        request: 包含 question 和 video_ids 的请求
+        current_user: 当前认证用户（通过JWT token自动获取）
+        
+    Returns:
+        MultiVideoResponse: 包含答案和元数据的响应
+    """
+    try:
+        # 从认证用户获取 user_id
+        user_id = current_user.id
+        
+        # 调用示例视频工作流
+        result = await run_example_video_query(
+            question=request.question,
+            video_ids=request.video_ids,
+            user_id=user_id,
+            session_id=request.session_id or f"session_{user_id}",
+            conversation_id=request.conversation_id,
+            model_name=request.model_name,
+            provider_id=request.provider_id,
         )
+        
+        # 提取响应数据
+        answer = result.get("answer", "")
+        metadata = result.get("metadata")
+        
+        # 确保answer不为空
+        if not answer:
+            answer = "抱歉，暂时无法生成总结内容。"
+        
+        # 返回标准化的响应（使用ResponseWrapper以匹配前端期望的格式）
+        response_data = MultiVideoResponse(
+            success=True,
+            answer=answer,
+            metadata=metadata
+        )
+        return R.success(data=response_data.model_dump())
+        
+    except ValueError as e:
+        return R.error(code=400, msg=f"输入验证失败: {str(e)}")
+    except Exception as e:
+        error_detail = str(e)
+        logger.error(f"Error in example_video_endpoint: {error_detail}")
+        traceback.print_exc()
+        return R.error(code=500, msg=f"处理失败: {error_detail}")
 
 
 @app.get("/health")

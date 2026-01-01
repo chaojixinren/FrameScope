@@ -88,6 +88,7 @@ def extract_timestamp_markers(markdown: str) -> List[Tuple[str, int, Optional[in
 def get_video_path_from_id(video_id: str, platform: str) -> Optional[str]:
     """
     根据video_id获取本地视频路径（如果已下载）
+    优先查找data目录，如果不存在则查找example目录
     
     Args:
         video_id: 视频ID（如BV号）
@@ -100,11 +101,17 @@ def get_video_path_from_id(video_id: str, platform: str) -> Optional[str]:
         # 目前主要支持bilibili，其他平台可以扩展
         return None
     
+    # 先查找data目录
     data_dir = get_data_dir()
     video_path = os.path.join(data_dir, f"{video_id}.mp4")
-    
     if os.path.exists(video_path):
         return video_path
+    
+    # 如果data目录不存在，查找example目录
+    example_dir = Path(__file__).parent.parent.parent.parent / "example"
+    example_video_path = example_dir / f"{video_id}.mp4"
+    if example_video_path.exists():
+        return str(example_video_path)
     
     return None
 
