@@ -127,11 +127,10 @@ yt-dlp==2025.3.31
 zopfli==0.2.3.post1
 
 # LangChain and LangGraph dependencies for agent module
-# Note: langchain-mcp-adapters 0.2.1 requires langchain-core>=1.0.0
-# This may conflict with other langchain packages that require langchain-core<1.0.0
-# Current working combination: langchain-mcp-adapters==0.2.1, langchain-core==1.2.5
+# Note: langchain package automatically manages langchain-core version
+# Do not explicitly specify langchain-core>=1.0.0 as it conflicts with langchain (all versions require langchain-core<1.0.0)
 langchain>=0.1.0
-langchain-core>=1.0.0  # Updated for langchain-mcp-adapters compatibility
+# langchain-core is managed by langchain package automatically
 langchain-openai>=0.0.5
 langchain-community>=0.0.20
 langgraph>=0.0.20

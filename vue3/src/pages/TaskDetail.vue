@@ -235,6 +235,13 @@ import { useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
 import { taskApi } from '@/api/task'
 import type { Task, QuestionAnswer } from '@/stores/task'
+import { marked } from 'marked'
+
+// 配置marked选项
+marked.setOptions({
+  breaks: true, // 支持GFM换行（单个换行符也会换行）
+  gfm: true, // 启用GitHub Flavored Markdown
+})
 
 const route = useRoute()
 const taskStore = useTaskStore()
@@ -295,12 +302,15 @@ const formatTime = (dateString: string) => {
 }
 
 const formatAnswer = (answer: string) => {
-  // 将换行符转换为<br>，保持格式
-  // 将**粗体**标记转换为<strong>标签
-  let formatted = answer
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>')
-  return formatted
+  // 使用marked解析Markdown格式
+  if (!answer) return ''
+  try {
+    return marked.parse(answer)
+  } catch (error) {
+    console.error('Markdown解析失败:', error)
+    // 如果解析失败，返回原始文本（转义HTML以防止XSS）
+    return answer.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
 }
 
 const canSendQuestion = computed(() => {
@@ -865,6 +875,144 @@ onMounted(async () => {
 .qa-text strong {
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* Markdown 渲染样式 */
+.qa-text :deep(h1),
+.qa-text :deep(h2),
+.qa-text :deep(h3),
+.qa-text :deep(h4),
+.qa-text :deep(h5),
+.qa-text :deep(h6) {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.qa-text :deep(h1) {
+  font-size: 1.5em;
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom: 0.5em;
+}
+
+.qa-text :deep(h2) {
+  font-size: 1.3em;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 0.3em;
+}
+
+.qa-text :deep(h3) {
+  font-size: 1.1em;
+}
+
+.qa-text :deep(h4),
+.qa-text :deep(h5),
+.qa-text :deep(h6) {
+  font-size: 1em;
+}
+
+.qa-text :deep(p) {
+  margin: 0.75em 0;
+  line-height: 1.6;
+}
+
+.qa-text :deep(ul),
+.qa-text :deep(ol) {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.qa-text :deep(li) {
+  margin: 0.25em 0;
+  line-height: 1.6;
+}
+
+.qa-text :deep(ul) {
+  list-style-type: disc;
+}
+
+.qa-text :deep(ol) {
+  list-style-type: decimal;
+}
+
+.qa-text :deep(blockquote) {
+  margin: 0.75em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--accent-blue);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.qa-text :deep(code) {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  color: var(--accent-blue);
+}
+
+.qa-text :deep(pre) {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.qa-text :deep(pre code) {
+  background-color: transparent;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 0.9em;
+}
+
+.qa-text :deep(a) {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.qa-text :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.qa-text :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 1.5em 0;
+}
+
+.qa-text :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+}
+
+.qa-text :deep(th),
+.qa-text :deep(td) {
+  border: 1px solid var(--border-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.qa-text :deep(th) {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.qa-text :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.75em 0;
+}
+
+.qa-text :deep(del) {
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 .qa-question .qa-text {

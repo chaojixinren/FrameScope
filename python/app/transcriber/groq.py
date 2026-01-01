@@ -33,9 +33,28 @@ class GroqTranscriber(Transcriber, ABC):
 
         if not provider:
             raise Exception("Groq 供应商未配置,请配置以后使用。")
+        
+        api_key = provider.get('api_key')
+        base_url = provider.get('base_url')
+        
+        # 验证 API Key 是否存在
+        if not api_key or api_key.strip() == '':
+            raise Exception("Groq API Key 为空，请检查数据库配置")
+        
+        # 确保 API Key 不包含 "Bearer " 前缀（OpenAI SDK 会自动添加）
+        api_key = api_key.strip()
+        if api_key.startswith('Bearer '):
+            api_key = api_key[7:].strip()
+            print(f"[Groq] 警告: API Key 包含 'Bearer ' 前缀，已自动移除")
+        
+        # 调试信息：验证配置（不打印完整 API Key）
+        print(f"[Groq] Base URL: {base_url}")
+        print(f"[Groq] API Key 已配置 (长度: {len(api_key)} 字符, 前缀: {api_key[:10]}...)")
+        print(f"[Groq] 注意: OpenAI SDK 会自动在请求头中添加 'Authorization: Bearer {api_key[:10]}...'")
+        
         client = OpenAI(
-            api_key=provider.get('api_key'),
-            base_url=provider.get('base_url')
+            api_key=api_key,
+            base_url=base_url
         )
         filename = file_path
 
