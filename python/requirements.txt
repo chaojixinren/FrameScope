@@ -132,11 +132,10 @@ zopfli==0.2.3.post1
 langchain>=0.1.0
 # langchain-core is managed by langchain package automatically
 langchain-openai>=0.0.5
-langchain-community>=0.0.20
 langgraph>=0.0.20
 langchain-mcp-adapters>=0.2.1  # Updated to fix import error
 bilibili-api>=9.0.0  
 nest-asyncio>=1.5.0  
 passlib[bcrypt]>=1.7.4  # 密码加密
-bcrypt<5.0.0  # bcrypt 5.0与passlib不兼容，使用4.x版本
+bcrypt>=4.0.1,<5.0.0  # bcrypt 5.0与passlib不兼容，使用4.x版本，确保与passlib 1.7.4兼容
 python-jose[cryptography]>=3.3.0  # JWT token处理

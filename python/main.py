@@ -66,15 +66,30 @@ async def lifespan(app: FastAPI):
     yield
 
 app = create_app(lifespan=lifespan)
-origins = [
-    "http://localhost",
-    "http://127.0.0.1",
-    "http://tauri.localhost",
-]
+
+# CORS 配置：允许的源列表
+# 支持从环境变量读取，如果没有则使用默认值
+cors_origins_env = os.getenv("CORS_ORIGINS")
+if cors_origins_env:
+    # 从环境变量读取，支持逗号分隔的多个源
+    origins = [origin.strip() for origin in cors_origins_env.split(",")]
+else:
+    # 默认允许的源（包含常见开发端口）
+    origins = [
+        "http://localhost",
+        "http://localhost:5173",  # Vite 默认端口
+        "http://localhost:3000",  # React 默认端口
+        "http://localhost:8080",  # Vue CLI 默认端口
+        "http://127.0.0.1",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
+        "http://tauri.localhost",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  #  加上 Tauri 的 origin
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

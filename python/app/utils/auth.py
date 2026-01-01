@@ -2,13 +2,13 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from dotenv import load_dotenv
+from app.utils.logger import get_logger
 
 load_dotenv()
 
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = get_logger(__name__)
 
 # JWT配置
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
@@ -18,29 +18,67 @@ JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
 def get_password_hash(password: str) -> str:
     """
-    生成密码哈希
+    生成密码哈希（直接使用 bcrypt，避免 passlib 兼容性问题）
     
     Args:
         password: 明文密码
         
     Returns:
-        str: bcrypt哈希后的密码
+        str: bcrypt哈希后的密码（字符串格式）
+        
+    Note:
+        bcrypt 限制密码最大长度为 72 字节，如果超过会自动截断
     """
-    return pwd_context.hash(password)
+    try:
+        # 确保密码是字符串类型
+        if not isinstance(password, str):
+            password = str(password)
+        
+        # 转换为字节（bcrypt 需要字节输入）
+        password_bytes = password.encode('utf-8')
+        password_length = len(password_bytes)
+        logger.debug(f"密码加密: 字符长度={len(password)}, 字节长度={password_length}")
+        
+        # bcrypt 限制：密码不能超过 72 字节
+        if password_length > 72:
+            logger.warning(f"密码超过 72 字节限制 ({password_length} 字节)，将截断到 72 字节")
+            password_bytes = password_bytes[:72]
+        
+        # 生成 salt 并哈希密码
+        # bcrypt.gensalt() 默认 rounds=12，这是安全的默认值
+        salt = bcrypt.gensalt()
+        hashed_bytes = bcrypt.hashpw(password_bytes, salt)
+        
+        # 转换为字符串返回
+        hashed = hashed_bytes.decode('utf-8')
+        logger.debug("密码加密成功")
+        return hashed
+    except Exception as e:
+        logger.error(f"密码加密失败: {e}, 密码类型: {type(password)}, 密码长度: {len(str(password)) if password else 0}")
+        raise
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    验证密码
+    验证密码（直接使用 bcrypt，避免 passlib 兼容性问题）
     
     Args:
         plain_password: 明文密码
-        hashed_password: 哈希后的密码
+        hashed_password: 哈希后的密码（字符串格式）
         
     Returns:
         bool: 密码是否正确
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # 转换为字节
+        plain_password_bytes = plain_password.encode('utf-8')
+        hashed_password_bytes = hashed_password.encode('utf-8')
+        
+        # 验证密码
+        return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+    except Exception as e:
+        logger.error(f"密码验证失败: {e}")
+        return False
 
 
 def create_access_token(user_id: int) -> str:
