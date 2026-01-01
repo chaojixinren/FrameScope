@@ -138,3 +138,6 @@ langgraph>=0.0.20
 langchain-mcp-adapters>=0.2.1  # Updated to fix import error
 bilibili-api>=9.0.0  
 nest-asyncio>=1.5.0  
+passlib[bcrypt]>=1.7.4  # 密码加密
+bcrypt<5.0.0  # bcrypt 5.0与passlib不兼容，使用4.x版本
+python-jose[cryptography]>=3.3.0  # JWT token处理

@@ -10,3 +10,12 @@ class StatusCode(IntEnum):
 
     INVALID_URL = 2001
     PARAM_ERROR = 2002
+    
+    # 认证相关错误码
+    AUTH_ERROR = 3001
+    TOKEN_EXPIRED = 3002
+    INSUFFICIENT_PERMISSION = 3003
+    
+    # 对话相关错误码
+    CONVERSATION_NOT_FOUND = 4001
+    CONVERSATION_ACCESS_DENIED = 4002

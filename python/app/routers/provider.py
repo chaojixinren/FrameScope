@@ -18,8 +18,7 @@ class ProviderRequest(BaseModel):
     logo: Optional[str] = None
     type: str
 
-class TestRequest(BaseModel):
-    id: str
+
 class ProviderUpdateRequest(BaseModel):
     id: str
     name: Optional[str] = None
@@ -85,8 +84,3 @@ def update_provider(data: ProviderUpdateRequest):
     except Exception as e:
         print(e)
         return R.error(msg=str(e))
-
-@router.post('/connect_test')
-def gpt_connect_test(data: TestRequest):
-    ModelService().connect_test(data.id)
-    return R.success(msg='连接成功')
