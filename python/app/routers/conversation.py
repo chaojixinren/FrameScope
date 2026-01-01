@@ -11,7 +11,7 @@ from app.db.conversation_dao import (
     delete_conversation,
     get_conversation_count_by_user_id
 )
-from app.db.message_dao import get_messages_by_conversation_id
+from app.db.message_dao import get_messages_by_conversation_id, get_message_count_by_conversation_id
 from app.dependencies.auth import get_current_user
 from app.db.models.user import User
 from app.db.models.conversation import Conversation
@@ -59,12 +59,15 @@ def get_conversations(
         
         conversation_list = []
         for conv in conversations:
+            # 计算每个对话的消息数量
+            message_count = get_message_count_by_conversation_id(conv.id)
             conversation_list.append({
                 "id": conv.id,
                 "user_id": conv.user_id,
                 "title": conv.title,
                 "created_at": conv.created_at.isoformat() if conv.created_at else None,
-                "updated_at": conv.updated_at.isoformat() if conv.updated_at else None
+                "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
+                "message_count": message_count
             })
         
         return R.success(data={
