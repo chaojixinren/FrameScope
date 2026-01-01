@@ -106,6 +106,7 @@ class MultiVideoRequest(BaseModel):
     model_name: Optional[str] = Field(None, description="GPT 模型名称（可选，不提供则使用默认）")
     provider_id: Optional[str] = Field(None, description="提供商 ID（可选，不提供则使用默认）")
     max_videos: Optional[int] = Field(5, ge=1, le=20, description="最大视频数量（可选，默认5，范围1-20）")
+    video_urls: Optional[List[str]] = Field(None, description="用户提供的视频URL列表（可选，如果提供则优先使用这些URL）")
     
     @field_validator('question')
     @classmethod
@@ -169,6 +170,7 @@ async def run_multi_video_query(
     model_name: str = None,
     provider_id: str = None,
     max_videos: int = 5,
+    video_urls: Optional[List[str]] = None,
 ) -> MultiVideoState:
     """
     运行多视频搜索和总结查询
@@ -238,6 +240,7 @@ async def run_multi_video_query(
         "metadata": None,
         "trace_data": None,
         "max_videos": max_videos,  # 传递最大视频数量
+        "user_provided_urls": video_urls,  # 传递用户提供的URL列表
     }
     
     # Run graph (异步)
@@ -326,6 +329,7 @@ async def multi_video_endpoint(
             model_name=request.model_name,
             provider_id=request.provider_id,
             max_videos=max_videos_to_use,
+            video_urls=request.video_urls,
         )
         
         # 提取响应数据

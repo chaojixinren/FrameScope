@@ -218,7 +218,6 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
-import type { Message } from '@/api/conversation'
 import { multiVideoApi, type MultiVideoResponse } from '@/api/multi_video'
 import { marked } from 'marked'
 
@@ -482,6 +481,63 @@ const handleEnterKey = (event: KeyboardEvent) => {
 
 // 已移除模拟数据生成函数，改用实际 API
 
+// 从文本中提取视频URL（支持Bilibili、YouTube、抖音等）
+const extractVideoUrls = (text: string): { urls: string[], cleanedText: string } => {
+  // 匹配各种视频URL格式
+  // 使用更通用的正则表达式，匹配完整的URL（包括查询参数），直到遇到空格或文本结束
+  const urlPatterns = [
+    // Bilibili 完整URL（支持查询参数和路径）
+    /https?:\/\/(www\.)?bilibili\.com\/video\/[a-zA-Z0-9]+[^\s]*/g,
+    // Bilibili 短链接
+    /https?:\/\/b23\.tv\/[a-zA-Z0-9]+[^\s]*/g,
+    // YouTube
+    /https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]+[^\s]*/g,
+    // 抖音
+    /https?:\/\/(www\.)?douyin\.com\/video\/[0-9]+[^\s]*/g,
+  ]
+  
+  const foundUrls: string[] = []
+  let cleanedText = text
+  
+  // 提取所有匹配的URL
+  urlPatterns.forEach(pattern => {
+    let match
+    while ((match = pattern.exec(text)) !== null) {
+      const url = match[0]
+      // 清理URL（移除末尾的标点符号，但保留查询参数）
+      // 只移除URL末尾的标点符号（不在查询参数中的）
+      let cleanUrl = url.trim()
+      // 如果URL末尾有标点符号（且不在查询参数中），移除它
+      if (cleanUrl.match(/[.,;:!?]$/) && !cleanUrl.includes('?')) {
+        cleanUrl = cleanUrl.replace(/[.,;:!?]+$/, '')
+      } else if (cleanUrl.match(/[.,;:!?]$/)) {
+        // 如果URL包含查询参数，检查标点是否在查询参数之后
+        const queryIndex = cleanUrl.indexOf('?')
+        if (queryIndex !== -1) {
+          const beforeQuery = cleanUrl.substring(0, queryIndex)
+          const afterQuery = cleanUrl.substring(queryIndex)
+          // 只移除查询参数之后的标点
+          const cleanedAfterQuery = afterQuery.replace(/[.,;:!?]+$/, '')
+          cleanUrl = beforeQuery + cleanedAfterQuery
+        }
+      }
+      
+      if (cleanUrl && !foundUrls.includes(cleanUrl)) {
+        foundUrls.push(cleanUrl)
+        // 从文本中移除URL（使用原始URL进行替换）
+        cleanedText = cleanedText.replace(url, '').trim()
+      }
+    }
+    // 重置正则表达式的lastIndex
+    pattern.lastIndex = 0
+  })
+  
+  // 清理多余的空格
+  cleanedText = cleanedText.replace(/\s+/g, ' ').trim()
+  
+  return { urls: foundUrls, cleanedText }
+}
+
 const sendQuestion = async () => {
   if (!canSendQuestion.value) return
 
@@ -501,6 +557,14 @@ const sendQuestion = async () => {
     // 判断是否是第一次回答（消息数量为0时是第一次）
     const isFirstAnswer = messages.value.length === 0
 
+    // 提取问题中的视频URL
+    const { urls: extractedUrls, cleanedText: cleanedQuestion } = extractVideoUrls(currentInput)
+    
+    if (extractedUrls.length > 0) {
+      console.log('从问题中提取到视频URL:', extractedUrls)
+      console.log('清理后的问题:', cleanedQuestion)
+    }
+
     // 如果没有conversationId，先创建新对话
     if (!targetConversationId) {
       const newConversation = await conversationStore.createConversation()
@@ -513,50 +577,34 @@ const sendQuestion = async () => {
       })
     }
 
-    // 只有后续对话才添加用户消息到本地显示列表（第一次回答不显示用户消息，但会保存到后端）
-    if (!isFirstAnswer) {
-      const userMessage: Message = {
-        id: Date.now(),
-        role: 'user',
-        content: currentInput,
-        created_at: new Date().toISOString()
-      }
-      conversationStore.addMessage(userMessage)
-    }
+    // 不再在前端预先添加消息，等待后端保存后统一加载
+    // 第一次回答不显示用户消息，但会保存到后端
+    // 后续对话的用户消息也会由后端保存，然后通过 loadConversation 统一加载
 
     let response: MultiVideoResponse
     
     if (isFirstAnswer) {
       // 第一次回答：使用 multi_video 接口（自动搜索相关视频）
       const maxVideosToUse = selectedVideoCount.value || 5
-      console.log('发送API请求，视频数量:', maxVideosToUse, 'selectedVideoCount.value:', selectedVideoCount.value)
+      console.log('发送API请求，视频数量:', maxVideosToUse, '提取的URL数量:', extractedUrls.length)
+      
+      // 使用清理后的问题文本，并传递提取的URL
       response = await multiVideoApi.query({
-        question: currentInput,
+        question: cleanedQuestion || currentInput, // 如果清理后为空，使用原始文本
         conversation_id: targetConversationId,
-        max_videos: maxVideosToUse
+        max_videos: maxVideosToUse,
+        video_urls: extractedUrls.length > 0 ? extractedUrls : undefined
       })
     } else {
       // 后续对话：使用 multi_video 接口（根据上下文进行正常对话）
       response = await multiVideoApi.query({
-        question: currentInput,
-        conversation_id: targetConversationId
+        question: cleanedQuestion || currentInput, // 如果清理后为空，使用原始文本
+        conversation_id: targetConversationId,
+        video_urls: extractedUrls.length > 0 ? extractedUrls : undefined
       })
     }
 
-    // 第一次回答时，只添加AI回复到本地（用户消息已由后端保存，不在前端显示）
-    // 后续对话时，用户消息已在上面的if中添加，这里添加AI回复
-    const assistantMessage: Message = {
-      id: Date.now() + 1,
-      role: 'assistant',
-      content: response.answer,
-      created_at: new Date().toISOString()
-    }
-    conversationStore.addMessage(assistantMessage)
-    
-    // 滚动到底部
-    scrollToBottom()
-
-    // 刷新对话列表和详情（确保数据同步，包括更新后的标题）
+    // 后端已经保存了用户消息和助手回复，直接重新加载对话即可
     // 注意：loadConversation会从后端加载所有消息（包括第一次的用户消息），
     // 但我们的显示逻辑会通过firstAnswer和followupMessages来区分显示
     await conversationStore.loadConversation(targetConversationId)

@@ -7,6 +7,7 @@ export interface MultiVideoRequest {
   model_name?: string
   provider_id?: string
   max_videos?: number  // 最大视频数量（可选，默认5）
+  video_urls?: string[]  // 用户提供的视频URL列表（可选，如果提供则优先使用这些URL）
 }
 
 export interface ExampleVideoRequest {

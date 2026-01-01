@@ -41,6 +41,11 @@ class BilibiliDownloader(Downloader, ABC):
             ],
             'noplaylist': True,
             'quiet': False,
+            # 网络超时和重试配置
+            'socket_timeout': 120,  # 套接字超时时间（秒），增加到120秒以应对慢速网络
+            'retries': 10,  # 总重试次数
+            'fragment_retries': 10,  # 片段重试次数
+            'file_access_retries': 5,  # 文件访问重试次数
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -91,6 +96,11 @@ class BilibiliDownloader(Downloader, ABC):
             'noplaylist': True,
             'quiet': False,
             'merge_output_format': 'mp4',  # 确保合并成 mp4
+            # 网络超时和重试配置
+            'socket_timeout': 120,  # 套接字超时时间（秒），增加到120秒以应对慢速网络
+            'retries': 10,  # 总重试次数
+            'fragment_retries': 10,  # 片段重试次数
+            'file_access_retries': 5,  # 文件访问重试次数
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

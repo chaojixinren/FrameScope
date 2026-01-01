@@ -22,6 +22,7 @@ class AIState(TypedDict):
     search_query: Optional[str]  # Agent1 生成的搜索查询
     video_ids: Optional[List[str]]  # 视频ID列表（用于example视频处理）
     max_videos: Optional[int]  # 最大视频数量（可选，默认5）
+    user_provided_urls: Optional[List[str]]  # 用户提供的视频URL列表（可选）
     
     # 笔记生成相关（多视频功能）
     note_results: Optional[List[Dict[str, Any]]]  # 每个视频的笔记结果

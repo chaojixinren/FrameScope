@@ -2,6 +2,7 @@ from abc import ABC
 import os
 
 from app.decorators.timeit import timeit
+from app.decorators.retry_rate_limit import retry_on_rate_limit
 from app.models.transcriber_model import TranscriptResult, TranscriptSegment
 from app.services.provider import ProviderService
 from app.transcriber.base import Transcriber
@@ -22,6 +23,7 @@ class GroqTranscriber(Transcriber, ABC):
 
 
     @timeit
+    @retry_on_rate_limit(max_retries=3, base_delay=60)
     def transcript(self, file_path: str) -> TranscriptResult:
         file_size = os.path.getsize(file_path)
         if file_size > MAX_SIZE_BYTES:
@@ -61,13 +63,17 @@ class GroqTranscriber(Transcriber, ABC):
         # 获取 Groq 转录模型，默认为 whisper-large-v3
         groq_model = os.getenv('GROQ_TRANSCRIBER_MODEL', 'whisper-large-v3')
         
+        # 读取文件内容（在重试循环外读取，避免重复读取）
         with open(filename, "rb") as file:
-            transcription = client.audio.transcriptions.create(
-                file=(filename, file.read()),
-                model=groq_model,
-                response_format="verbose_json",
-            )
-            print(transcription.text)
+            file_content = file.read()
+        
+        # 调用 API（如果遇到速率限制，装饰器会自动重试）
+        transcription = client.audio.transcriptions.create(
+            file=(filename, file_content),
+            model=groq_model,
+            response_format="verbose_json",
+        )
+        print(transcription.text)
         print(transcription)
         segments = []
         full_text = ""
