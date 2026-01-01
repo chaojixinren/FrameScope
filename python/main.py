@@ -105,6 +105,7 @@ class MultiVideoRequest(BaseModel):
     conversation_id: Optional[int] = Field(None, description="对话ID（可选，如果提供则加载历史消息）")
     model_name: Optional[str] = Field(None, description="GPT 模型名称（可选，不提供则使用默认）")
     provider_id: Optional[str] = Field(None, description="提供商 ID（可选，不提供则使用默认）")
+    max_videos: Optional[int] = Field(5, ge=1, le=20, description="最大视频数量（可选，默认5，范围1-20）")
     
     @field_validator('question')
     @classmethod
@@ -167,6 +168,7 @@ async def run_multi_video_query(
     conversation_id: Optional[int] = None,
     model_name: str = None,
     provider_id: str = None,
+    max_videos: int = 5,
 ) -> MultiVideoState:
     """
     运行多视频搜索和总结查询
@@ -235,10 +237,11 @@ async def run_multi_video_query(
         "answer": None,
         "metadata": None,
         "trace_data": None,
+        "max_videos": max_videos,  # 传递最大视频数量
     }
     
     # Run graph (异步)
-    logger.info(f"Starting Multi-Video Graph - User ID: {user_id}, Conversation ID: {current_conversation_id}, Question: {question}")
+    logger.info(f"Starting Multi-Video Graph - User ID: {user_id}, Conversation ID: {current_conversation_id}, Question: {question}, Max Videos: {max_videos}")
     
     result = await graph.ainvoke(initial_state)
     
@@ -307,6 +310,13 @@ async def multi_video_endpoint(
         # 从认证用户获取 user_id（更安全，防止伪造）
         user_id = current_user.id
         
+        # 记录接收到的参数
+        logger.info(f"接收到的请求参数: max_videos={request.max_videos}, question={request.question[:50]}...")
+        
+        # 确定要使用的视频数量
+        max_videos_to_use = request.max_videos if request.max_videos is not None else 5
+        logger.info(f"使用的视频数量: {max_videos_to_use}")
+        
         # 调用多视频工作流
         result = await run_multi_video_query(
             question=request.question,
@@ -315,6 +325,7 @@ async def multi_video_endpoint(
             conversation_id=request.conversation_id,
             model_name=request.model_name,
             provider_id=request.provider_id,
+            max_videos=max_videos_to_use,
         )
         
         # 提取响应数据

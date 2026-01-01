@@ -159,6 +159,21 @@
 
         <!-- 问题输入区 -->
         <div class="qa-input-area">
+          <!-- 视频数量选择（仅在第一次提问时显示） -->
+          <div v-if="!conversationId || messages.length === 0" class="video-count-selector">
+            <label for="video-count-input" class="video-count-label">分析视频数量：</label>
+            <input
+              id="video-count-input"
+              v-model.number="selectedVideoCount"
+              type="number"
+              class="video-count-input"
+              min="1"
+              max="20"
+              placeholder="请输入视频数量（1-20）"
+            />
+            <span class="video-count-hint">系统将搜索并分析指定数量的相关视频（建议3-10个）</span>
+          </div>
+          
           <div class="qa-input-container">
             <textarea
               v-model="questionInput"
@@ -256,6 +271,8 @@ const sendingQuestion = ref(false)
 const deletingConversation = ref(false)
 // 当前任务的视频ID列表
 const currentVideoIds = ref<string[]>([])
+// 选择的视频数量（默认5个，可以从URL参数中获取）
+const selectedVideoCount = ref<number>(5)
 
 // 自动滚动到底部（使用主页面滚动条）
 const scrollToBottom = () => {
@@ -447,7 +464,9 @@ const formatAnswer = (answer: string) => {
 
 
 const canSendQuestion = computed(() => {
-  return questionInput.value.trim().length > 0 && !sendingQuestion.value
+  const questionValid = questionInput.value.trim().length > 0
+  const videoCountValid = selectedVideoCount.value >= 1 && selectedVideoCount.value <= 20
+  return questionValid && videoCountValid && !sendingQuestion.value
 })
 
 const handleEnterKey = (event: KeyboardEvent) => {
@@ -509,9 +528,12 @@ const sendQuestion = async () => {
     
     if (isFirstAnswer) {
       // 第一次回答：使用 multi_video 接口（自动搜索相关视频）
+      const maxVideosToUse = selectedVideoCount.value || 5
+      console.log('发送API请求，视频数量:', maxVideosToUse, 'selectedVideoCount.value:', selectedVideoCount.value)
       response = await multiVideoApi.query({
         question: currentInput,
-        conversation_id: targetConversationId
+        conversation_id: targetConversationId,
+        max_videos: maxVideosToUse
       })
     } else {
       // 后续对话：使用 multi_video 接口（根据上下文进行正常对话）
@@ -586,6 +608,16 @@ const handleDeleteConversation = async () => {
 }
 
 onMounted(async () => {
+  // 首先读取URL参数中的maxVideos（如果存在），在任何其他操作之前设置
+  const initialMaxVideos = route.query.maxVideos as string | undefined
+  if (initialMaxVideos) {
+    const maxVideosNum = parseInt(initialMaxVideos)
+    if (!isNaN(maxVideosNum) && maxVideosNum >= 1 && maxVideosNum <= 20) {
+      selectedVideoCount.value = maxVideosNum
+      console.log('从URL参数读取视频数量:', maxVideosNum)
+    }
+  }
+  
   // 如果有conversationId，加载对话详情
   if (conversationId.value) {
     loading.value = true
@@ -601,16 +633,18 @@ onMounted(async () => {
       
       // 检查是否有初始问题需要自动发送（新建任务时传递的 question 参数）
       const initialQuestion = route.query.question as string | undefined
+      
       if (initialQuestion && conversationStore.currentMessages.length === 0) {
         // 如果对话中没有消息，自动发送初始问题
         questionInput.value = initialQuestion
         // 等待一下确保 UI 更新，然后自动发送
         await nextTick()
+        console.log('发送问题，使用视频数量:', selectedVideoCount.value)
         await sendQuestion()
-        // 发送后清除 URL 中的 question 参数，避免刷新页面时重复发送
+        // 发送后清除 URL 中的 question 和 maxVideos 参数，避免刷新页面时重复发送
         router.replace({
           path: route.path,
-          query: { ...route.query, question: undefined }
+          query: { ...route.query, question: undefined, maxVideos: undefined }
         })
       }
     } catch (error) {
@@ -1837,6 +1871,71 @@ onMounted(async () => {
 
 .qa-input-area {
   margin-top: 24px;
+}
+
+.video-count-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+}
+
+.video-count-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.video-count-input {
+  padding: 6px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  width: 150px;
+}
+
+.video-count-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-light);
+}
+
+.video-count-input:hover {
+  border-color: var(--border-medium);
+}
+
+.video-count-input::-webkit-inner-spin-button,
+.video-count-input::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.video-count-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .video-count-selector {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .video-count-hint {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 .qa-input-container {

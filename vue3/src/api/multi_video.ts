@@ -6,6 +6,7 @@ export interface MultiVideoRequest {
   conversation_id?: number
   model_name?: string
   provider_id?: string
+  max_videos?: number  // 最大视频数量（可选，默认5）
 }
 
 export interface ExampleVideoRequest {
@@ -30,6 +31,7 @@ export interface MultiVideoResponse {
 export const multiVideoApi = {
   // 发送多视频查询请求
   query: async (data: MultiVideoRequest): Promise<MultiVideoResponse> => {
+    console.log('发送API请求，数据:', JSON.stringify(data, null, 2))
     const response = await api.post<MultiVideoResponse>('/multi_video', data)
     return response.data
   },

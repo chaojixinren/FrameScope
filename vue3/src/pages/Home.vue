@@ -27,6 +27,22 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="video-count-input">分析视频数量</label>
+            <input
+              id="video-count-input"
+              v-model.number="form.maxVideos"
+              type="number"
+              class="video-count-input"
+              min="1"
+              max="20"
+              placeholder="请输入视频数量（1-20）"
+            />
+            <div class="form-hint">
+              系统将搜索并分析指定数量的相关视频（建议3-10个，默认5个）
+            </div>
+          </div>
+
           <div v-if="error" class="error-message">
             {{ error }}
           </div>
@@ -57,14 +73,17 @@ const conversationStore = useConversationStore()
 const taskStore = useTaskStore()
 
 const form = ref({
-  question: ''
+  question: '',
+  maxVideos: 5  // 默认5个视频
 })
 
 const loading = ref(false)
 const error = ref('')
 
 const canSubmit = computed(() => {
-  return !loading.value && form.value.question.trim().length > 0
+  const questionValid = form.value.question.trim().length > 0
+  const videoCountValid = form.value.maxVideos >= 1 && form.value.maxVideos <= 20
+  return !loading.value && questionValid && videoCountValid
 })
 
 const handleCreateTask = async () => {
@@ -99,12 +118,15 @@ const handleCreateTask = async () => {
     
     // 立即跳转到任务详情页，传递 conversationId 和初始问题
     // TaskDetail 页面将负责调用 API 并更新任务状态
+    const maxVideos = form.value.maxVideos || 5
+    console.log('Home页面：跳转到TaskDetail，视频数量:', maxVideos, 'form.value.maxVideos:', form.value.maxVideos)
     router.push({
       name: 'Task',
       params: { id: taskId },
       query: { 
         conversationId: conversation.id,
-        question: questionText
+        question: questionText,
+        maxVideos: maxVideos.toString()
       }
     })
   } catch (err: any) {
@@ -177,6 +199,34 @@ const handleCreateTask = async () => {
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 8px;
+}
+
+.video-count-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.video-count-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-light);
+}
+
+.video-count-input:hover {
+  border-color: var(--border-medium);
+}
+
+.video-count-input::-webkit-inner-spin-button,
+.video-count-input::-webkit-outer-spin-button {
+  opacity: 1;
+  cursor: pointer;
 }
 
 .form-hint {

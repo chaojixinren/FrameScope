@@ -15,7 +15,7 @@ def video_search_node(state: AIState) -> AIState:
     1. 接收用户问题（如 "索尼 A7M4 怎么样"）
     2. 扩展查询关键词（添加 "评测"、"实拍"、"选购" 等）
     3. 调用 Bilibili API 搜索视频
-    4. 计算热度得分并筛选前 5 个高质量视频
+    4. 计算热度得分并筛选指定数量的高质量视频（默认5个，可通过max_videos配置）
     5. 过滤营销关键词视频
     6. 返回视频 URL 列表供下游节点使用
     
@@ -39,11 +39,18 @@ def video_search_node(state: AIState) -> AIState:
     expanded_query = expand_search_query(question)
     print(f"[Video Search Node] 扩展后的查询: {expanded_query}")
     
+    # 获取最大视频数量（从state中获取，如果没有则使用默认值5）
+    max_videos = state.get("max_videos", 5)
+    print(f"[Video Search Node] 从state获取的max_videos: {max_videos}, state中的值: {state.get('max_videos')}")
+    # 确保max_videos在合理范围内（1-20）
+    max_videos = max(1, min(20, max_videos))
+    print(f"[Video Search Node] 最终使用的视频数量: {max_videos}")
+    
     # 搜索并筛选视频（使用 video_tools 中的工具函数）
     # 限制视频时长在30分钟以内，优化下载和处理时间
     formatted_videos = search_and_filter_videos(
         query=expanded_query,
-        max_results=5,
+        max_results=max_videos,
         page=1,
         page_size=50,
         max_duration_seconds=1400 
