@@ -790,11 +790,10 @@ onMounted(async () => {
 }
 
 .page-shell__actions .btn--danger {
-  color: #dc2626;
   font-weight: 500;
 }
 
-/* 浅色模式下使用更深的红色以确保对比度 */
+/* 浅色模式：使用深色文字 */
 @media (prefers-color-scheme: light) {
   .page-shell__actions .btn--danger {
     color: #991b1b;
@@ -806,6 +805,22 @@ onMounted(async () => {
   
   .page-shell__actions .btn--danger:disabled {
     color: #991b1b;
+    opacity: 0.6;
+  }
+}
+
+/* 深色模式：使用浅色文字 */
+@media (prefers-color-scheme: dark) {
+  .page-shell__actions .btn--danger {
+    color: #fca5a5;
+  }
+  
+  .page-shell__actions .btn--danger:hover {
+    color: #f87171;
+  }
+  
+  .page-shell__actions .btn--danger:disabled {
+    color: #fca5a5;
     opacity: 0.6;
   }
 }
@@ -936,6 +951,15 @@ onMounted(async () => {
 .loading-panel {
   margin-left: var(--space-4);
   margin-right: var(--space-4);
+}
+
+.content-main .panel:has(.markdown) {
+  overflow: visible;
+}
+
+.content-main .panel__bd {
+  overflow: visible;
+  position: relative;
 }
 
 .panel-title {
@@ -1095,6 +1119,9 @@ onMounted(async () => {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-light);
   background: var(--surface-2);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .task-result-time {
@@ -1122,6 +1149,9 @@ onMounted(async () => {
   border-radius: 12px;
   border: 1px solid var(--border-light);
   background: var(--surface-3);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .message-item.user .message-content {
@@ -1306,6 +1336,16 @@ onMounted(async () => {
   position: relative;
 }
 
+.markdown {
+  position: relative;
+  overflow: visible;
+}
+
+.markdown :deep(.hover-image-link) {
+  position: relative;
+  z-index: 1;
+}
+
 .markdown :deep(.hover-image-link::after) {
   content: '';
   position: absolute;
@@ -1324,7 +1364,8 @@ onMounted(async () => {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 20;
+  z-index: 9999;
+  box-shadow: var(--shadow-2);
 }
 
 .markdown :deep(.hover-image-link:hover::after) {

@@ -347,6 +347,10 @@ const handleCreateTask = async () => {
   color: var(--text-secondary);
 }
 
+.form-group .textarea {
+  resize: vertical;
+}
+
 .form-hint {
   font-size: 12px;
   color: var(--text-tertiary);

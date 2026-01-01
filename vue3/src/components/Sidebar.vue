@@ -169,8 +169,10 @@ onMounted(async () => {
   background: var(--shell-bg);
   border-right: 1px solid var(--shell-border);
   backdrop-filter: blur(18px);
-  transition: width 0.2s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  will-change: width;
+  transform: translateZ(0);
 }
 
 .sidebar.collapsed {
@@ -183,6 +185,13 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--shell-border);
+  transition: gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding: var(--space-3);
+  justify-content: center;
+  gap: 0;
 }
 
 .sidebar-title__main {
@@ -202,6 +211,14 @@ onMounted(async () => {
   width: 36px;
   height: 36px;
   padding: 0;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .icon-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .sidebar-content {
