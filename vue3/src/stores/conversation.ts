@@ -13,11 +13,19 @@ export const useConversationStore = defineStore('conversation', () => {
   const hasConversations = computed(() => conversations.value.length > 0)
 
   // 获取对话列表
-  const loadConversations = async () => {
+  const loadConversations = async (limit: number = 50, offset: number = 0) => {
     loading.value = true
     try {
-      const response = await conversationApi.getConversations()
-      conversations.value = response.conversations
+      const response = await conversationApi.getConversations(limit, offset)
+      // 处理可能的 null 值
+      conversations.value = response.conversations.map(conv => ({
+        id: conv.id,
+        user_id: conv.user_id,
+        title: conv.title || '',
+        created_at: conv.created_at || '',
+        updated_at: conv.updated_at || '',
+        message_count: conv.message_count
+      }))
       return response
     } catch (error) {
       console.error('加载对话列表失败:', error)
@@ -35,12 +43,18 @@ export const useConversationStore = defineStore('conversation', () => {
       currentConversation.value = {
         id: detail.id,
         user_id: detail.user_id,
-        title: detail.title,
-        created_at: detail.created_at,
-        updated_at: detail.updated_at,
+        title: detail.title || '',
+        created_at: detail.created_at || '',
+        updated_at: detail.updated_at || '',
         message_count: detail.message_count
       }
-      currentMessages.value = detail.messages || []
+      // 确保消息列表不为空，并处理可能的 null 值
+      currentMessages.value = (detail.messages || []).map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        created_at: msg.created_at || new Date().toISOString()
+      }))
       return detail
     } catch (error) {
       console.error('加载对话详情失败:', error)
@@ -54,9 +68,18 @@ export const useConversationStore = defineStore('conversation', () => {
   const createConversation = async (title?: string): Promise<Conversation> => {
     try {
       const conversation = await conversationApi.createConversation(title)
+      // 处理可能的 null 值
+      const normalizedConv: Conversation = {
+        id: conversation.id,
+        user_id: conversation.user_id,
+        title: conversation.title || '',
+        created_at: conversation.created_at || new Date().toISOString(),
+        updated_at: conversation.updated_at || new Date().toISOString(),
+        message_count: conversation.message_count
+      }
       // 添加到列表开头
-      conversations.value.unshift(conversation)
-      return conversation
+      conversations.value.unshift(normalizedConv)
+      return normalizedConv
     } catch (error) {
       console.error('创建对话失败:', error)
       throw error

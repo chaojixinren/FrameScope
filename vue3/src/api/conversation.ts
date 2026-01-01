@@ -5,8 +5,8 @@ export interface Conversation {
   id: number
   user_id: number
   title: string
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
   message_count?: number
 }
 
@@ -14,7 +14,7 @@ export interface Message {
   id: number
   role: 'user' | 'assistant'
   content: string
-  created_at: string
+  created_at: string | null
 }
 
 export interface ConversationDetail extends Conversation {
