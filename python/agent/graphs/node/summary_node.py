@@ -51,11 +51,39 @@ async def summary_node(state: AIState) -> AIState:
     
     print(f"[Summary Agent] 开始总结 {len(note_results)} 个视频的笔记")
     
-    # 构建所有笔记的 Markdown 内容
+    # 构建所有笔记的 Markdown 内容（包含原始 transcript 时间戳信息）
     notes_text = ""
     for i, note in enumerate(note_results, 1):
         notes_text += f"\n## 视频 {i}: {note.get('title', '未知标题')}\n\n"
         notes_text += f"**来源**: {note.get('platform', '未知平台')} - [{note.get('url', '未知链接')}]({note.get('url', '#')})\n\n"
+        
+        # 添加原始 transcript segments 信息（帮助 LLM 理解时间戳和内容的对应关系）
+        transcript = note.get('transcript', {})
+        segments = transcript.get('segments', [])
+        if segments:
+            notes_text += "**原始时间戳参考**（用于准确引用时间戳）：\n"
+            # 只显示前30个segment作为参考（避免输入过长），如果segments太多则采样
+            max_segments = 30
+            if len(segments) > max_segments:
+                # 均匀采样
+                step = len(segments) // max_segments
+                sampled_segments = [segments[i] for i in range(0, len(segments), step)][:max_segments]
+            else:
+                sampled_segments = segments
+            
+            for seg in sampled_segments:
+                start = seg.get('start', 0)
+                mm = int(start) // 60
+                ss = int(start) % 60
+                text = seg.get('text', '').strip()
+                # 限制文本长度，避免单个segment太长
+                if len(text) > 150:
+                    text = text[:150] + "..."
+                notes_text += f"- `[{mm:02d}:{ss:02d}]` {text}\n"
+            notes_text += "\n"
+        
+        # 添加处理后的笔记内容
+        notes_text += "**笔记内容**：\n"
         notes_text += f"{note.get('markdown', '无内容')}\n\n"
         notes_text += "---\n\n"
     

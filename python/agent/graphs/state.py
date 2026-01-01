@@ -30,6 +30,9 @@ class AIState(TypedDict):
     # 总结相关（多视频功能）
     summary_result: Optional[str]  # 最终总结
     
+    # 证据链回溯相关
+    trace_data: Optional[Dict[str, Any]]  # {时间戳键: {"video_url": str, "frame_url": str, "video_id": str, "timestamp": int, "platform": str}}
+    
     # 元数据（多视频功能）
     metadata: Optional[Dict[str, Any]]  # 元数据 {"total_videos": int, "processing_time": float}
 

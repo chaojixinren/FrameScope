@@ -1,13 +1,14 @@
 """
 可交互的完整流程测试
-测试 video_search -> note_generation -> summary_node 的完整流程
+测试 video_search -> note_generation -> summary_node -> trace_node 的完整流程
 
 功能：
 1. 用户可以输入问题
 2. 自动执行 video_search_node 搜索视频
 3. 自动执行 note_generation_node 生成笔记
 4. 自动执行 summary_node 生成总结
-5. 显示最终结果
+5. 自动执行 trace_node 进行证据链回溯（生成关键帧）
+6. 显示最终结果（包含关键帧截图）
 
 运行方式：
    方式1：从项目根目录运行（推荐）
@@ -42,6 +43,7 @@ from app.db.engine import get_db
 from graphs.node.video_search_node import video_search_node
 from graphs.node.note_generation_node import note_generation_node
 from graphs.node.summary_node import summary_node
+from graphs.node.trace_node import trace_node
 from graphs.state import AIState
 
 # 测试配置
@@ -210,11 +212,13 @@ async def run_summary(state: AIState) -> AIState:
         
         if summary or answer:
             print("\n✓ 总结生成成功\n")
-            print("-"*60)
-            print("最终总结:")
-            print("-"*60)
-            print(answer if answer else summary)
-            print("-"*60)
+            # 检查是否包含时间戳标记
+            import re
+            timestamp_count = len(re.findall(r'\*?Content-\[\d{2}:\d{2}\](?:-video\d+)?', summary or answer))
+            if timestamp_count > 0:
+                print(f"  ✓ 发现 {timestamp_count} 个时间戳标记，将在回溯节点中生成关键帧")
+            else:
+                print("  ⚠ 未发现时间戳标记，回溯节点将跳过")
         else:
             print("\n⚠ 未生成总结内容")
         
@@ -225,6 +229,61 @@ async def run_summary(state: AIState) -> AIState:
         traceback.print_exc()
         state["summary_result"] = f"总结生成失败: {str(e)}"
         state["answer"] = state["summary_result"]
+        return state
+
+
+async def run_trace(state: AIState) -> AIState:
+    """执行证据链回溯节点"""
+    print_section("步骤 4: 证据链回溯（生成关键帧）")
+    
+    summary_result = state.get("summary_result", "")
+    note_results = state.get("note_results", [])
+    
+    if not summary_result:
+        print("⚠ 没有总结内容，跳过回溯")
+        return state
+    
+    if not note_results:
+        print("⚠ 没有视频笔记结果，无法生成关键帧")
+        return state
+    
+    print("正在提取时间戳并生成关键帧截图...")
+    print("（这可能需要一些时间，请耐心等待）\n")
+    
+    try:
+        result_state = await trace_node(state)
+        
+        # 检查结果
+        updated_summary = result_state.get("summary_result", "")
+        trace_data = result_state.get("trace_data", {})
+        
+        if trace_data:
+            print(f"\n✓ 成功生成 {len(trace_data)} 个关键帧截图\n")
+            for key, data in list(trace_data.items())[:3]:  # 只显示前3个
+                video_id = data.get("video_id", "")
+                timestamp = data.get("timestamp", 0)
+                frame_url = data.get("frame_url", "")
+                mm = timestamp // 60
+                ss = timestamp % 60
+                print(f"  - 视频 {video_id} @ {mm:02d}:{ss:02d}")
+                print(f"    关键帧: {frame_url}")
+            
+            if len(trace_data) > 3:
+                print(f"  ... 还有 {len(trace_data) - 3} 个关键帧")
+        else:
+            print("\n⚠ 未生成关键帧（可能没有找到时间戳标记或视频未下载）")
+        
+        # 检查总结是否更新
+        if updated_summary != summary_result:
+            print("\n✓ 总结已更新（时间戳标记已替换为关键帧图片）")
+        else:
+            print("\n⚠ 总结未更新（可能没有时间戳标记需要处理）")
+        
+        return result_state
+    except Exception as e:
+        print(f"\n✗ 回溯失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return state
 
 
@@ -249,6 +308,7 @@ async def run_full_pipeline(question: str):
         "provider_id": TEST_PROVIDER_ID,
         "note_generation_status": None,
         "summary_result": None,
+        "trace_data": None,
         "metadata": None,
     }
     
@@ -271,6 +331,33 @@ async def run_full_pipeline(question: str):
     # 步骤 3: 总结
     state = await run_summary(state)
     
+    # 检查是否有总结
+    if not state.get("summary_result"):
+        print("\n⚠ 未生成总结，跳过回溯步骤")
+        return state
+    
+    # 步骤 4: 证据链回溯
+    state = await run_trace(state)
+    
+    # 显示最终结果
+    print_section("最终结果")
+    final_answer = state.get("answer", state.get("summary_result", ""))
+    if final_answer:
+        print("包含关键帧证据的最终总结:\n")
+        print("-"*60)
+        # 显示前1000字符，避免输出过长
+        print(final_answer[:1000])
+        if len(final_answer) > 1000:
+            print(f"\n... (还有 {len(final_answer) - 1000} 字符)")
+        print("-"*60)
+        
+        # 显示trace_data统计
+        trace_data = state.get("trace_data", {})
+        if trace_data:
+            print(f"\n✓ 共生成 {len(trace_data)} 个关键帧证据")
+    else:
+        print("⚠ 未生成最终结果")
+    
     print_section("流程完成")
     print("所有步骤已执行完成！")
     
@@ -286,6 +373,11 @@ def main():
     print("  1. 视频搜索 (video_search_node)")
     print("  2. 笔记生成 (note_generation_node)")
     print("  3. 多视频总结 (summary_node)")
+    print("  4. 证据链回溯 (trace_node) - 生成关键帧截图")
+    print("\n注意：")
+    print("  - 回溯节点会为总结中的时间戳标记生成关键帧截图")
+    print("  - 确保 ffmpeg 已安装并可用")
+    print("  - 视频会在笔记生成阶段下载（供回溯使用）")
     print("\n" + "-"*60)
     
     # 设置数据库配置
