@@ -49,6 +49,8 @@ def generate_single_note_sync(video: Dict, model_name: str, provider_id: str) ->
         # 为每个视频生成唯一的 task_id，用于状态跟踪、缓存和元数据保存
         task_id = str(uuid.uuid4())
         
+        # 为了 trace_node 能够生成关键帧，需要下载视频
+        # 设置 video_understanding=True 但 grid_size=None，这样会下载视频但不会生成缩略图网格
         note_result = generator.generate(
             video_url=video["url"],
             platform=video["platform"],
@@ -62,9 +64,9 @@ def generate_single_note_sync(video: Dict, model_name: str, provider_id: str) ->
             style=None,
             extras=None,
             output_path=None,
-            video_understanding=False,
+            video_understanding=True,  # 设置为 True 以下载视频（供 trace_node 使用）
             video_interval=0,
-            grid_size=None,
+            grid_size=None,  # 不生成缩略图网格，只下载视频
         )
         
         if not note_result:

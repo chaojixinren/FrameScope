@@ -136,6 +136,5 @@ langchain-openai>=0.0.5
 langchain-community>=0.0.20
 langgraph>=0.0.20
 langchain-mcp-adapters>=0.2.1  # Updated to fix import error
-# Google Custom Search JSON API 使用 requests（已包含在依赖中）
-bilibili-api>=9.0.0  # Bilibili API Python 库，用于视频搜索（使用 misc.web_search_by_type）
-nest-asyncio>=1.5.0  # 用于在已有事件循环中运行异步代码
+bilibili-api>=9.0.0  
+nest-asyncio>=1.5.0  
