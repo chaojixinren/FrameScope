@@ -296,6 +296,15 @@ async def trace_node(state: AIState) -> AIState:
             else:
                 img_url = f"{BACKEND_BASE_URL.rstrip('/')}/{IMAGE_BASE_URL.lstrip('/')}/{filename}"
             
+            video_title = audio_meta.get("title") or video_info.get("title") or ""
+            video_index: Optional[int] = None
+            for idx, note in enumerate(note_results):
+                if note is video_info or note.get("url") == video_url:
+                    video_index = idx + 1
+                    break
+            video_index_label = f"视频 {video_index}" if video_index else "视频"
+            video_source_text = f"{video_index_label} · {video_title}" if video_title else video_index_label
+
             # 保存到trace_data（处理重复时间戳的情况）
             trace_key = f"{video_id}_{timestamp_seconds}"
             # 如果已存在相同的trace_key，添加序号
@@ -308,6 +317,8 @@ async def trace_node(state: AIState) -> AIState:
             trace_data[trace_key] = {
                 "video_url": video_url,
                 "video_id": video_id,
+                "video_title": video_title,
+                "video_index": video_index,
                 "timestamp": timestamp_seconds,
                 "frame_url": img_url,
                 "frame_path": screenshot_path,
@@ -357,8 +368,9 @@ async def trace_node(state: AIState) -> AIState:
             # 格式：结论文本 + 关键帧图片 + 原片链接（自然排列）
             replacement = (
                 f"{conclusion_text}\n\n"
-                f"![关键帧 @ {mm:02d}:{ss:02d}]({img_url})\n\n"
-                f"[查看原片 @ {mm:02d}:{ss:02d}]({video_link_url})"
+                f"来源视频：{video_source_text}\n\n"
+                f"![关键帧 · {video_index_label} @ {mm:02d}:{ss:02d}]({img_url})\n\n"
+                f"[查看原片 · {video_index_label} @ {mm:02d}:{ss:02d}]({video_link_url})"
             )
             
             # 替换标记（只替换第一次出现的，避免重复替换）
