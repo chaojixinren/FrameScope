@@ -49,9 +49,9 @@
       </div>
     </div>
 
-    <div v-else class="content-single">
-      <section class="content-main">
-        <!-- 视频链接卡片 -->
+    <div v-else class="content-grid">
+      <aside class="content-left">
+        <!-- 对话概览 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
@@ -88,6 +88,7 @@
           </div>
         </div>
 
+        <!-- 视频列表 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
@@ -123,8 +124,10 @@
             </div>
           </div>
         </div>
+      </aside>
 
-        <!-- 分析结果卡片 -->
+      <section class="content-right">
+        <!-- 分析结果 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
@@ -876,39 +879,7 @@ onMounted(async () => {
 }
 
 .page-shell__actions .btn--danger {
-  font-weight: 500;
-}
-
-/* 浅色模式：使用深色文字 */
-@media (prefers-color-scheme: light) {
-  .page-shell__actions .btn--danger {
-    color: #991b1b;
-  }
-  
-  .page-shell__actions .btn--danger:hover {
-    color: #7f1d1d;
-  }
-  
-  .page-shell__actions .btn--danger:disabled {
-    color: #991b1b;
-    opacity: 0.6;
-  }
-}
-
-/* 深色模式：使用浅色文字 */
-@media (prefers-color-scheme: dark) {
-  .page-shell__actions .btn--danger {
-    color: #fca5a5;
-  }
-  
-  .page-shell__actions .btn--danger:hover {
-    color: #f87171;
-  }
-  
-  .page-shell__actions .btn--danger:disabled {
-    color: #fca5a5;
-    opacity: 0.6;
-  }
+  font-weight: 600;
 }
 
 .page-kicker {
@@ -1035,31 +1006,31 @@ onMounted(async () => {
   height: 96px;
 }
 
-.content-single {
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+}
+
+.content-left,
+.content-right {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.content-main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-width: 100%;
-}
-
-.content-main .panel,
 .error-panel,
 .loading-panel {
   margin-left: var(--space-4);
   margin-right: var(--space-4);
 }
 
-.content-main .panel:has(.markdown) {
+.content-right .panel:has(.markdown) {
   overflow: visible;
 }
 
-.content-main .panel__bd {
+.content-right .panel__bd {
   overflow: visible;
   position: relative;
 }
@@ -1517,6 +1488,11 @@ onMounted(async () => {
   .toolbar__content {
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+    padding: 0 var(--space-3);
   }
 }
 

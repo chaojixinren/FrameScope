@@ -71,6 +71,10 @@
   --success: #2bd4a3;
   --warning: #f4b860;
   --danger: #ff6b6b;
+  --danger-bg: rgba(255, 107, 107, 0.18);
+  --danger-border: rgba(255, 107, 107, 0.5);
+  --danger-text: #ffd4d4;
+  --danger-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
   --shadow-1: 0 10px 30px rgba(4, 10, 22, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-2: 0 24px 80px rgba(3, 8, 18, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --glow-1: 0 0 22px rgba(91, 212, 255, 0.2);
@@ -122,6 +126,10 @@
   --success: #179c6f;
   --warning: #d9952c;
   --danger: #e5484d;
+  --danger-bg: rgba(229, 72, 77, 0.16);
+  --danger-border: rgba(229, 72, 77, 0.45);
+  --danger-text: #7f1d1d;
+  --danger-shadow: 0 0 18px rgba(229, 72, 77, 0.18);
   --shadow-1: 0 14px 30px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --shadow-2: 0 26px 70px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --glow-1: 0 0 20px rgba(34, 150, 243, 0.25);
@@ -301,14 +309,14 @@ select {
 }
 
 .btn--danger {
-  border: 1px solid rgba(255, 107, 107, 0.5);
-  background: rgba(255, 107, 107, 0.18);
-  color: #ffd4d4;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .btn--danger:hover:not(:disabled) {
-  border-color: rgba(255, 107, 107, 0.8);
-  box-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
+  border-color: var(--danger);
+  box-shadow: var(--danger-shadow);
 }
 
 .btn.is-loading {
@@ -329,6 +337,11 @@ select {
 .btn--danger .btn__spinner {
   border-color: rgba(255, 255, 255, 0.25);
   border-top-color: rgba(255, 255, 255, 0.6);
+}
+
+:root[data-theme="light"] .btn--danger .btn__spinner {
+  border-color: rgba(127, 29, 29, 0.25);
+  border-top-color: rgba(127, 29, 29, 0.6);
 }
 
 .input,
