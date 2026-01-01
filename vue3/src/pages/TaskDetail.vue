@@ -1,215 +1,327 @@
 <template>
-  <div class="task-detail-container">
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
-      <p class="loading-text">加载中...</p>
+  <div class="task-detail-page">
+    <section class="page-shell">
+      <div class="page-shell__main">
+        <div class="page-kicker">????</div>
+        <h1 class="page-title">{{ conversationStore.currentConversation?.title || '???' }}</h1>
+        <p class="page-subtitle">
+          {{
+            conversationStore.currentConversation
+              ? formatDate(conversationStore.currentConversation.created_at)
+              : '???????????'
+          }}
+        </p>
+      </div>
+      <div class="page-shell__actions">
+        <button
+          v-if="conversationId"
+          type="button"
+          class="btn btn--danger"
+          :class="{ 'is-loading': deletingConversation }"
+          :disabled="deletingConversation"
+          @click="handleDeleteConversation"
+        >
+          <span v-if="deletingConversation" class="btn__spinner" aria-hidden="true"></span>
+          ????
+        </button>
+      </div>
+    </section>
+
+    <div class="panel toolbar">
+      <div class="panel__bd toolbar__content">
+        <div class="toolbar-group">
+          <label for="message-search">????</label>
+          <input
+            id="message-search"
+            v-model="searchQuery"
+            class="input"
+            placeholder="????????????"
+          />
+        </div>
+        <div class="toolbar-meta">
+          <div class="meta-item">
+            <span class="meta-label">??</span>
+            <span
+              class="tag status-tag"
+              :data-state="sendingQuestion ? 'processing' : firstAnswer ? 'completed' : 'idle'"
+            >
+              {{ sendingQuestion ? '???' : firstAnswer ? '???' : '???' }}
+            </span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">???</span>
+            <span class="badge">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn--primary" @click="focusComposer">????</button>
+      </div>
     </div>
 
-    <div v-else class="task-content">
-      <!-- 对话头部信息 -->
-      <div v-if="conversationStore.currentConversation" class="task-header">
-        <div class="task-header-content">
-          <h1 class="task-title">{{ conversationStore.currentConversation.title || '新对话' }}</h1>
-          <div class="task-meta-info">
-            <span class="task-date">{{ formatDate(conversationStore.currentConversation.created_at) }}</span>
-          </div>
-        </div>
-        <div class="task-header-actions">
-          <button
-            v-if="conversationId"
-            class="delete-btn"
-            @click="handleDeleteConversation"
-            :disabled="deletingConversation"
-            title="删除对话"
-          >
-            <svg
-              v-if="!deletingConversation"
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-            >
-              <path
-                d="M5 5L15 15M15 5L5 15"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <div v-else class="delete-loading-spinner"></div>
-          </button>
+    <div v-if="errorMessage" class="panel error-panel">
+      <div class="panel__bd error-state">
+        <div class="error-icon" aria-hidden="true">?</div>
+        <div>
+          <div class="error-title">????</div>
+          <div class="error-desc">{{ errorMessage }}</div>
         </div>
       </div>
+    </div>
 
-      <!-- 第一次回答（任务结果） -->
-      <div v-if="firstAnswer || (sendingQuestion && messages.length === 0)" class="section task-result-section">
-        <div class="task-result-content">
-          <!-- 加载中状态 -->
-          <div v-if="sendingQuestion && messages.length === 0" class="task-steps">
-            <div class="task-step">
-              <div class="step-status loading">
-                <div class="loading-spinner-small"></div>
-              </div>
-              <div class="step-content">
-                <div class="step-title">正在获取视频连接......</div>
-              </div>
+    <div v-if="loading" class="panel loading-panel">
+      <div class="panel__bd loading-state">
+        <div class="skeleton skeleton-line"></div>
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
+      </div>
+    </div>
+
+    <div v-else class="content-grid">
+      <aside class="content-left">
+        <div class="panel">
+          <div class="panel__hd">
+            <div>
+              <h2 class="panel-title">????</h2>
+              <p class="panel-subtitle">????????????</p>
+            </div>
+            <span class="badge">Console</span>
+          </div>
+          <div class="panel__bd meta-list">
+            <div class="meta-row">
+              <span class="meta-label">????</span>
+              <span class="meta-value">
+                {{
+                  conversationStore.currentConversation
+                    ? formatDate(conversationStore.currentConversation.created_at)
+                    : '?'
+                }}
+              </span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">????</span>
+              <span class="meta-value">
+                {{ sendingQuestion ? '???' : firstAnswer ? '???' : '????' }}
+              </span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">????</span>
+              <span class="meta-value">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">?? ID</span>
+              <span class="meta-value">#{{ conversationId || '?' }}</span>
             </div>
           </div>
-          
-          <!-- 已完成状态 -->
-          <div v-else-if="firstAnswer" class="task-steps">
-            <!-- 步骤1: 获取视频连接 -->
-            <div class="task-step">
-              <div class="step-status completed">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <div class="step-content">
-                <div class="step-title">正在获取视频连接......</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__hd">
+            <div>
+              <h2 class="panel-title">????</h2>
+              <p class="panel-subtitle">????????????</p>
+            </div>
+          </div>
+          <div class="panel__bd">
+            <div v-if="currentVideoIds.length > 0" class="video-list">
+              <a
+                v-for="(videoId, index) in currentVideoIds"
+                :key="videoId"
+                class="video-item"
+                :href="`https://www.bilibili.com/video/${videoId}`"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="video-index">{{ index + 1 }}</span>
+                <span class="video-id">{{ videoId }}</span>
+              </a>
+            </div>
+            <div v-else class="empty-inline">
+              <div class="empty-icon" aria-hidden="true">?</div>
+              <div>????????</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="content-right">
+        <div class="panel">
+          <div class="panel__hd">
+            <div>
+              <h2 class="panel-title">????</h2>
+              <p class="panel-subtitle">??????????</p>
+            </div>
+            <span class="tag">Analysis</span>
+          </div>
+          <div class="panel__bd">
+            <div v-if="sendingQuestion && messages.length === 0" class="task-steps">
+              <div class="task-step">
+                <div class="step-status loading">
+                  <div class="loading-spinner-small"></div>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">????????...</div>
+                </div>
               </div>
             </div>
-            
-            <!-- 步骤2: 已获取视频列表 -->
-            <div class="task-step" v-if="currentVideoIds.length > 0">
-              <div class="step-status completed">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+
+            <div v-else-if="firstAnswer" class="task-steps">
+              <div class="task-step">
+                <div class="step-status completed">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">???????</div>
+                </div>
               </div>
-              <div class="step-content">
-                <div class="step-title">已获取到对应视频：</div>
-                <div class="video-list-container">
-                  <div 
-                    v-for="(videoId, index) in currentVideoIds" 
-                    :key="videoId" 
-                    class="video-item"
-                  >
-                    视频{{ index + 1 }}：<a :href="`https://www.bilibili.com/video/${videoId}`" target="_blank" class="video-link">{{ videoId }}</a>
+
+              <div class="task-step" v-if="currentVideoIds.length > 0">
+                <div class="step-status completed">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">???????</div>
+                  <div class="video-list-inline">
+                    <span v-for="(videoId, index) in currentVideoIds" :key="videoId" class="video-chip">
+                      ?? {{ index + 1 }} ? {{ videoId }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="task-step">
+                <div class="step-status completed">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">???????????</div>
+                </div>
+              </div>
+
+              <div class="analysis-result markdown" v-html="formatAnswer(firstAnswer.content)"></div>
+              <div class="task-result-time">{{ formatTime(firstAnswer.created_at) }}</div>
+            </div>
+
+            <div v-else class="empty-state">
+              <div class="empty-icon" aria-hidden="true">?</div>
+              <div class="empty-title">??????</div>
+              <div class="empty-desc">??????????????????</div>
+              <button type="button" class="btn btn--ghost" @click="focusComposer">????</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="hasFollowupConversation" class="panel">
+          <div class="panel__hd">
+            <div>
+              <h2 class="panel-title">????</h2>
+              <p class="panel-subtitle">????? AI ???</p>
+            </div>
+          </div>
+          <div class="panel__bd">
+            <div class="messages-list">
+              <div
+                v-for="(msg, index) in followupMessages"
+                :key="`msg-${msg.id || index}-${msg.created_at}`"
+                class="message-item"
+                :class="msg.role"
+              >
+                <div class="message-content">
+                  <div class="message-text markdown" v-html="formatAnswer(msg.content)"></div>
+                  <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+                </div>
+              </div>
+
+              <div v-if="sendingQuestion && messages.length > 0" class="message-item assistant">
+                <div class="message-content">
+                  <div class="message-text">
+                    <div class="typing-indicator" aria-label="??????">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <!-- 步骤3: 下载并分析 -->
-            <div class="task-step">
-              <div class="step-status completed">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <div class="step-content">
-                <div class="step-title">正在下载并分析视频内容(完成后可点击"视频xx"的标题进入内容展示)......</div>
-              </div>
-            </div>
-            
-            <!-- 步骤4: 分析结果 -->
-            <div class="task-step">
-              <div class="step-status completed">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <div class="step-content">
-                <div class="step-title">已完成视频内容分析：</div>
-                <div class="analysis-result">
-                  <div class="result-content" v-html="formatAnswer(firstAnswer.content)"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div v-if="firstAnswer" class="task-result-time">{{ formatTime(firstAnswer.created_at) }}</div>
-        </div>
-      </div>
-
-      <!-- 后续对话消息列表（显示在"继续对话"上方） -->
-      <div v-if="hasFollowupConversation" class="messages-list">
-        <div
-          v-for="(msg, index) in followupMessages"
-          :key="`msg-${msg.id || index}-${msg.created_at}`"
-          class="message-item"
-          :class="msg.role"
-        >
-          <div class="message-content">
-            <div class="message-text" v-html="formatAnswer(msg.content)"></div>
-            <div class="message-time">{{ formatTime(msg.created_at) }}</div>
           </div>
         </div>
-        
-        <!-- 发送中状态（后续对话时显示） -->
-        <div v-if="sendingQuestion && messages.length > 0" class="message-item assistant">
-          <div class="message-content">
-            <div class="message-text">
-              <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
+
+        <div class="panel">
+          <div class="panel__hd">
+            <div>
+              <h2 class="panel-title">
+                {{ conversationId && (firstAnswer || hasFollowupConversation) ? '????' : '????' }}
+              </h2>
+              <p class="panel-subtitle">??????????????????</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- AI问答区域（对话形式） -->
-      <div class="section qa-section">
-        <h2 class="section-title">{{ conversationId && (firstAnswer || hasFollowupConversation) ? '继续对话' : '开始新对话' }}</h2>
-        <p class="section-description">基于视频内容理解，您可以提问，AI将为您提供深入的分析和解答</p>
-
-        <!-- 问题输入区 -->
-        <div class="qa-input-area">
-          <!-- 视频数量选择（仅在第一次提问时显示） -->
-          <div v-if="!conversationId || messages.length === 0" class="video-count-selector">
-            <label for="video-count-input" class="video-count-label">分析视频数量：</label>
-            <input
-              id="video-count-input"
-              v-model.number="selectedVideoCount"
-              type="number"
-              class="video-count-input"
-              min="1"
-              max="20"
-              placeholder="请输入视频数量（1-20）"
-            />
-            <span class="video-count-hint">系统将搜索并分析指定数量的相关视频（建议3-10个）</span>
-          </div>
-          
-          <div class="qa-input-container">
-            <textarea
-              v-model="questionInput"
-              class="qa-textarea"
-              placeholder="请输入您的问题，例如：索尼A7M4相机怎么样？"
-              rows="3"
-              @keydown.enter.prevent="handleEnterKey"
-            ></textarea>
-            <button
-              class="qa-send-btn"
-              :disabled="!canSendQuestion || sendingQuestion"
-              @click="sendQuestion"
-            >
-              <svg
-                v-if="!sendingQuestion"
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="none"
-              >
-                <path
-                  d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+          <div class="panel__bd">
+            <div class="qa-input-area">
+              <div v-if="!conversationId || messages.length === 0" class="video-count-selector">
+                <label for="video-count-input" class="video-count-label">??????</label>
+                <input
+                  id="video-count-input"
+                  v-model.number="selectedVideoCount"
+                  type="number"
+                  class="input video-count-input"
+                  min="1"
+                  max="20"
+                  placeholder="????????1-20?"
+                  aria-describedby="video-count-hint"
                 />
-              </svg>
-              <div v-else class="qa-loading-spinner"></div>
-            </button>
-          </div>
-          <div class="qa-hint">
-            <span class="text-tertiary">按 Enter 发送，Shift + Enter 换行</span>
+                <span id="video-count-hint" class="video-count-hint">
+                  ???????????????????? 3-10 ??
+                </span>
+              </div>
+
+              <div class="qa-input-container">
+                <label class="sr-only" for="question-textarea">????</label>
+                <textarea
+                  id="question-textarea"
+                  ref="composerRef"
+                  v-model="questionInput"
+                  class="textarea qa-textarea"
+                  placeholder="?????????????A7M4??????"
+                  rows="3"
+                  @keydown.enter.prevent="handleEnterKey"
+                  aria-describedby="qa-hint"
+                ></textarea>
+                <button
+                  type="button"
+                  class="btn btn--primary qa-send-btn"
+                  :class="{ 'is-loading': sendingQuestion }"
+                  :disabled="!canSendQuestion || sendingQuestion"
+                  @click="sendQuestion"
+                >
+                  <svg
+                    v-if="!sendingQuestion"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span v-else class="btn__spinner" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div id="qa-hint" class="qa-hint">? Enter ???Shift + Enter ??</div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -273,6 +385,10 @@ const currentVideoIds = ref<string[]>([])
 // 选择的视频数量（默认5个，可以从URL参数中获取）
 const selectedVideoCount = ref<number>(5)
 
+const errorMessage = ref('')
+const searchQuery = ref('')
+const composerRef = ref<HTMLTextAreaElement | null>(null)
+
 // 自动滚动到底部（使用主页面滚动条）
 const scrollToBottom = () => {
   nextTick(() => {
@@ -283,6 +399,11 @@ const scrollToBottom = () => {
     })
   })
 }
+
+const focusComposer = () => {
+  composerRef.value?.focus()
+}
+
 
 // 监听消息变化，自动滚动到底部（只在后续对话时滚动）
 watch(followupMessages, () => {
@@ -545,6 +666,7 @@ const sendQuestion = async () => {
   if (!questionText) return
 
   sendingQuestion.value = true
+  errorMessage.value = ''
   const currentInput = questionText
   questionInput.value = ''
 
@@ -618,8 +740,9 @@ const sendQuestion = async () => {
     questionInput.value = currentInput
     
     // 显示错误提示（可以后续添加 toast 组件）
-    const errorMessage = error?.response?.data?.detail || error?.message || '发送问题失败，请稍后重试'
-    alert(errorMessage)
+    const errorText = error?.response?.data?.detail || error?.message || '发送问题失败，请稍后重试'
+    errorMessage.value = errorText
+    alert(errorText)
     
     // 移除刚才添加的消息（回滚乐观更新）
     // 恢复到发送前的消息数量
@@ -648,8 +771,9 @@ const handleDeleteConversation = async () => {
     router.push('/')
   } catch (error: any) {
     console.error('删除对话失败:', error)
-    const errorMessage = error?.response?.data?.msg || error?.message || '删除对话失败，请稍后重试'
-    alert(errorMessage)
+    const errorText = error?.response?.data?.msg || error?.message || '删除对话失败，请稍后重试'
+    errorMessage.value = errorText
+    alert(errorText)
   } finally {
     deletingConversation.value = false
   }
@@ -712,378 +836,513 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.task-detail-container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 24px;
-}
-
-.loading-state,
-.processing-state {
+.task-detail-page {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-light);
-  border-top-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.pulse-dot {
-  width: 12px;
-  height: 12px;
-  background-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.2);
-  }
-}
-
-.processing-indicator {
+.page-shell {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-secondary);
-  font-size: 16px;
-}
-
-.loading-text {
-  color: var(--text-secondary);
-  font-size: 16px;
-}
-
-.task-header {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border-light);
-  display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.task-header-content {
-  flex: 1;
-  min-width: 0;
+.page-shell__main {
+  max-width: 720px;
 }
 
-.task-header-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
+.page-kicker {
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
 }
 
-.task-title {
-  font-size: 28px;
+.page-title {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 3vw, 32px);
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 12px;
-  line-height: 1.3;
 }
 
-.task-meta-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.task-status {
+.page-subtitle {
+  margin: 0;
   font-size: 14px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: var(--lh-relaxed);
 }
 
-.task-status.pending {
-  background-color: var(--bg-tertiary);
+.toolbar__content {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.toolbar-group {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
-.task-status.processing {
-  background-color: var(--accent-blue-light);
-  color: var(--accent-blue);
+.toolbar-meta {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.task-status.completed {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.task-status.error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.task-date {
-  font-size: 14px;
+.meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   color: var(--text-tertiary);
 }
 
-.delete-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background-color: var(--bg-primary);
-  color: var(--text-secondary);
-  cursor: pointer;
+.status-tag[data-state='processing'] {
+  background: rgba(245, 200, 106, 0.16);
+  border-color: rgba(245, 200, 106, 0.5);
+  color: #f5c76a;
+}
+
+.status-tag[data-state='completed'] {
+  background: rgba(43, 212, 163, 0.16);
+  border-color: rgba(43, 212, 163, 0.5);
+  color: #a5f2d9;
+}
+
+.status-tag[data-state='idle'] {
+  background: rgba(148, 163, 184, 0.16);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: var(--text-tertiary);
+}
+
+.error-panel .error-state {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  outline: none;
+  gap: 12px;
+  align-items: flex-start;
 }
 
-.delete-btn:hover:not(:disabled) {
-  background-color: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
-  color: #ef4444;
+.error-icon {
+  font-size: 20px;
+  color: var(--warning);
 }
 
-.delete-btn:active:not(:disabled) {
-  transform: scale(0.95);
+.error-title {
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 
-.delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.error-desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
-.delete-loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border-light);
-  border-top-color: var(--text-secondary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.loading-state {
+  display: grid;
+  gap: 12px;
 }
 
-.section {
-  margin-bottom: 40px;
+.skeleton-line {
+  height: 12px;
 }
 
-/* 任务结果区域样式 */
-.task-result-section {
-  margin-bottom: 40px;
+.skeleton-block {
+  height: 96px;
 }
 
-.task-result-content {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  padding: 32px;
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: var(--space-4);
 }
 
-/* 任务步骤样式 */
-.task-steps {
+.content-left,
+.content-right {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-4);
+}
+
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.panel-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.meta-list {
+  display: grid;
+  gap: 10px;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background: var(--surface-1);
+}
+
+.meta-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.video-list {
+  display: grid;
+  gap: 8px;
+}
+
+.video-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(91, 212, 255, 0.2);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.video-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(91, 212, 255, 0.5);
+  box-shadow: var(--glow-1);
+}
+
+.video-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--primary);
+  background: rgba(91, 212, 255, 0.16);
+}
+
+.video-id {
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.empty-inline {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.empty-state {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-tertiary);
+}
+
+.empty-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.empty-desc {
+  font-size: 12px;
+}
+
+.task-steps {
+  display: grid;
+  gap: 14px;
 }
 
 .task-step {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 12px;
 }
 
 .step-status {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  background: rgba(91, 212, 255, 0.14);
+  color: var(--primary);
 }
 
 .step-status.loading {
-  border: 2px solid var(--border-light);
-  border-top-color: var(--accent-blue);
-  animation: spin 1s linear infinite;
-}
-
-.step-status.completed {
-  background-color: var(--accent-blue);
-  color: white;
+  background: rgba(245, 200, 106, 0.14);
+  color: #f5c76a;
 }
 
 .step-content {
   flex: 1;
-  min-width: 0;
 }
 
 .step-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-
-.video-list-container {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.video-item {
   font-size: 14px;
   color: var(--text-primary);
-  line-height: 1.6;
 }
 
-.video-link {
-  color: var(--accent-blue);
-  text-decoration: none;
-  word-break: break-all;
+.video-list-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-.video-link:hover {
-  text-decoration: underline;
+.video-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(91, 212, 255, 0.12);
+  border: 1px solid rgba(91, 212, 255, 0.3);
+  color: var(--primary);
 }
 
 .analysis-result {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+}
+
+.task-result-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
   margin-top: 12px;
 }
 
-.result-content {
-  font-size: 14px;
-  line-height: 1.8;
+.messages-list {
+  display: grid;
+  gap: 16px;
+}
+
+.message-item {
+  display: flex;
+}
+
+.message-item.user {
+  justify-content: flex-end;
+}
+
+.message-content {
+  max-width: 78%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-3);
+}
+
+.message-item.user .message-content {
+  background: linear-gradient(135deg, rgba(91, 212, 255, 0.9), rgba(74, 125, 255, 0.85));
+  color: var(--text-on-primary);
+  border-color: transparent;
+}
+
+.message-time {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.message-item.user .message-time {
+  color: var(--text-on-primary-muted);
+}
+
+.qa-input-area {
+  display: grid;
+  gap: 12px;
+}
+
+.video-count-selector {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+}
+
+.video-count-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.video-count-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.qa-input-container {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.qa-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.qa-send-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.qa-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.loading-spinner-small {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(245, 200, 106, 0.3);
+  border-top-color: rgba(245, 200, 106, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.markdown :deep(p) {
+  margin: 0.6em 0;
+  line-height: 1.7;
+}
+
+.markdown :deep(h1),
+.markdown :deep(h2),
+.markdown :deep(h3),
+.markdown :deep(h4) {
   color: var(--text-primary);
-}
-
-.result-content :deep(p) {
-  margin: 0.75em 0;
-  line-height: 1.8;
-}
-
-.result-content :deep(p:first-child) {
-  margin-top: 0;
-}
-
-.result-content :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.result-content :deep(ul),
-.result-content :deep(ol) {
-  margin: 0.75em 0;
-  padding-left: 1.5em;
-}
-
-.result-content :deep(li) {
-  margin: 0.25em 0;
-  line-height: 1.8;
-}
-
-.result-content :deep(h1),
-.result-content :deep(h2),
-.result-content :deep(h3),
-.result-content :deep(h4),
-.result-content :deep(h5),
-.result-content :deep(h6) {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  margin: 1em 0 0.4em;
   line-height: 1.4;
 }
 
-.result-content :deep(h1) {
-  font-size: 1.5em;
-  border-bottom: 2px solid var(--border-light);
-  padding-bottom: 0.5em;
+.markdown :deep(ul),
+.markdown :deep(ol) {
+  margin: 0.6em 0;
+  padding-left: 1.4em;
 }
 
-.result-content :deep(h2) {
-  font-size: 1.3em;
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 0.3em;
+.markdown :deep(li) {
+  margin: 0.3em 0;
 }
 
-.result-content :deep(h3) {
-  font-size: 1.1em;
-}
-
-.result-content :deep(code) {
-  background-color: var(--bg-tertiary);
+.markdown :deep(code) {
+  background: var(--surface-code);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
-  color: var(--accent-blue);
+  color: var(--primary-2);
 }
 
-.result-content :deep(pre) {
-  background-color: var(--bg-tertiary);
+.markdown :deep(pre) {
+  background: var(--surface-code);
   border: 1px solid var(--border-light);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 12px;
   overflow-x: auto;
-  margin: 0.75em 0;
 }
 
-.result-content :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-  color: var(--text-primary);
-}
-
-.result-content :deep(blockquote) {
-  margin: 0.75em 0;
+.markdown :deep(blockquote) {
+  margin: 0.6em 0;
   padding-left: 1em;
-  border-left: 3px solid var(--accent-blue);
+  border-left: 3px solid rgba(91, 212, 255, 0.6);
   color: var(--text-secondary);
-  font-style: italic;
 }
 
-.result-content :deep(a) {
-  color: var(--accent-blue);
+.markdown :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+}
+
+.markdown :deep(th),
+.markdown :deep(td) {
+  border: 1px solid var(--border-light);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.markdown :deep(th) {
+  background: var(--surface-code);
+  position: sticky;
+  top: 0;
+}
+
+.markdown :deep(img) {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.markdown :deep(a) {
+  color: var(--primary);
   text-decoration: none;
 }
 
-.result-content :deep(a:hover) {
+.markdown :deep(a:hover) {
   text-decoration: underline;
 }
 
-/* 隐藏"查看原片"前的图片 */
-.result-content :deep(.hidden-original-image) {
+.markdown :deep(.hidden-original-image) {
   display: none !important;
 }
 
-/* "查看原片"链接悬浮显示缩略图 */
-.result-content :deep(.hover-image-link) {
+.markdown :deep(.hover-image-link) {
   position: relative;
 }
 
-.result-content :deep(.hover-image-link::after) {
+.markdown :deep(.hover-image-link::after) {
   content: '';
   position: absolute;
   bottom: 100%;
@@ -1095,451 +1354,18 @@ onMounted(async () => {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: var(--surface-tooltip);
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 1000;
+  z-index: 20;
 }
 
-.result-content :deep(.hover-image-link:hover::after) {
+.markdown :deep(.hover-image-link:hover::after) {
   opacity: 1;
   transform: translateX(-50%) translateY(-12px);
-}
-
-.result-content :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--border-light);
-  margin: 1.5em 0;
-}
-
-.result-content :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.75em 0;
-}
-
-.result-content :deep(th),
-.result-content :deep(td) {
-  border: 1px solid var(--border-light);
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.result-content :deep(th) {
-  background-color: var(--bg-tertiary);
-  font-weight: 600;
-}
-
-.result-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 0.75em 0;
-}
-
-.loading-spinner-small {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border-light);
-  border-top-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.task-result-text {
-  font-size: 15px;
-  line-height: 1.8;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-}
-
-.task-result-text :deep(p) {
-  margin: 0.75em 0;
-  line-height: 1.8;
-}
-
-.task-result-text :deep(p:first-child) {
-  margin-top: 0;
-}
-
-.task-result-text :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.task-result-text :deep(ul),
-.task-result-text :deep(ol) {
-  margin: 0.75em 0;
-  padding-left: 1.5em;
-}
-
-.task-result-text :deep(li) {
-  margin: 0.25em 0;
-  line-height: 1.8;
-}
-
-.task-result-text :deep(h1),
-.task-result-text :deep(h2),
-.task-result-text :deep(h3),
-.task-result-text :deep(h4),
-.task-result-text :deep(h5),
-.task-result-text :deep(h6) {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-  line-height: 1.4;
-}
-
-.task-result-text :deep(code) {
-  background-color: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.9em;
-  color: var(--accent-blue);
-}
-
-.task-result-text :deep(pre) {
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 0.75em 0;
-}
-
-.task-result-text :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-  color: var(--text-primary);
-}
-
-.task-result-time {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-light);
-}
-
-.task-result-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  gap: 16px;
-}
-
-.task-result-loading .loading-text {
-  color: var(--text-secondary);
-  font-size: 15px;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.video-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.video-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.video-item:hover {
-  border-color: var(--border-medium);
-}
-
-.video-index {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.video-link {
-  flex: 1;
-  color: var(--accent-blue);
-  text-decoration: none;
-  word-break: break-all;
-  line-height: 1.5;
-}
-
-.video-link:hover {
-  text-decoration: underline;
-}
-
-.content-box {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 20px;
-}
-
-.common-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.list-item {
-  padding-left: 24px;
-  position: relative;
-  color: var(--text-primary);
-  line-height: 1.6;
-}
-
-.list-item::before {
-  content: '•';
-  position: absolute;
-  left: 8px;
-  color: var(--accent-blue);
-  font-weight: bold;
-}
-
-.contradictions-list,
-.unique-features-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.contradiction-item,
-.unique-feature-item {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 20px;
-  transition: all 0.2s ease;
-}
-
-.contradiction-item:hover,
-.unique-feature-item:hover {
-  border-color: var(--border-medium);
-}
-
-.contradiction-topic {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-  color: #ef4444;
-}
-
-.contradiction-points {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.contradiction-point {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  background-color: var(--bg-primary);
-  border-left: 3px solid var(--border-medium);
-  border-radius: 4px;
-}
-
-.point-video {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.point-view {
-  font-size: 14px;
-  color: var(--text-primary);
-  line-height: 1.5;
-}
-
-.feature-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-.feature-video {
-  color: var(--accent-blue);
-}
-
-.feature-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.feature-item {
-  padding-left: 24px;
-  position: relative;
-  color: var(--text-primary);
-  line-height: 1.6;
-}
-
-.feature-item::before {
-  content: '→';
-  position: absolute;
-  left: 8px;
-  color: var(--text-tertiary);
-}
-
-.error-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-}
-
-.error-message-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: #ef4444;
-  text-align: center;
-}
-
-.empty-state {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-state p {
-  font-size: 16px;
-}
-
-/* 问答区域样式 */
-.qa-section {
-  border-top: 2px solid var(--border-light);
-  padding-top: 40px;
-}
-
-.section-description {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
-
-.messages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 40px;
-  padding: 16px 0;
-}
-
-.messages-list .message-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.messages-list .message-item.user {
-  align-items: flex-end;
-}
-
-.messages-list .message-item.assistant {
-  align-items: flex-start;
-}
-
-.messages-list .message-content {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-light);
-}
-
-.messages-list .message-item.user .message-content {
-  background-color: var(--accent-blue);
-  color: white;
-  border-color: var(--accent-blue);
-}
-
-.messages-list .message-text {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-primary);
-}
-
-.messages-list .message-item.user .message-text {
-  color: white;
-}
-
-.messages-list .message-time {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 4px;
-}
-
-.messages-list .message-item.user .message-time {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* 打字指示器 */
-.typing-indicator {
-  display: flex;
-  gap: 4px;
-  padding: 8px 0;
-}
-
-.typing-indicator span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--text-secondary);
-  animation: typing 1.4s infinite ease-in-out;
-}
-
-.typing-indicator span:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: -0.16s;
 }
 
 @keyframes typing {
@@ -1553,531 +1379,37 @@ onMounted(async () => {
   }
 }
 
-.qa-list {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.qa-item {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.qa-question,
-.qa-answer {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.qa-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: white;
-}
-
-.user-avatar {
-  background-color: var(--accent-blue);
-}
-
-.ai-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.qa-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.qa-text {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: var(--text-primary);
-  line-height: 1.6;
-  word-wrap: break-word;
-}
-
-.qa-text strong {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Markdown 渲染样式 */
-.qa-text :deep(h1),
-.qa-text :deep(h2),
-.qa-text :deep(h3),
-.qa-text :deep(h4),
-.qa-text :deep(h5),
-.qa-text :deep(h6) {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-  line-height: 1.4;
-}
-
-.qa-text :deep(h1) {
-  font-size: 1.5em;
-  border-bottom: 2px solid var(--border-light);
-  padding-bottom: 0.5em;
-}
-
-.qa-text :deep(h2) {
-  font-size: 1.3em;
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 0.3em;
-}
-
-.qa-text :deep(h3) {
-  font-size: 1.1em;
-}
-
-.qa-text :deep(h4),
-.qa-text :deep(h5),
-.qa-text :deep(h6) {
-  font-size: 1em;
-}
-
-.qa-text :deep(p) {
-  margin: 0.75em 0;
-  line-height: 1.6;
-}
-
-.qa-text :deep(ul),
-.qa-text :deep(ol) {
-  margin: 0.75em 0;
-  padding-left: 1.5em;
-}
-
-.qa-text :deep(li) {
-  margin: 0.25em 0;
-  line-height: 1.6;
-}
-
-.qa-text :deep(ul) {
-  list-style-type: disc;
-}
-
-.qa-text :deep(ol) {
-  list-style-type: decimal;
-}
-
-.qa-text :deep(blockquote) {
-  margin: 0.75em 0;
-  padding-left: 1em;
-  border-left: 3px solid var(--accent-blue);
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.qa-text :deep(code) {
-  background-color: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.9em;
-  color: var(--accent-blue);
-}
-
-.qa-text :deep(pre) {
-  background-color: var(--bg-tertiary);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 0.75em 0;
-}
-
-.qa-text :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-  color: var(--text-primary);
-  font-size: 0.9em;
-}
-
-.qa-text :deep(a) {
-  color: var(--accent-blue);
-  text-decoration: none;
-}
-
-.qa-text :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.qa-text :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--border-light);
-  margin: 1.5em 0;
-}
-
-.qa-text :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.75em 0;
-}
-
-.qa-text :deep(th),
-.qa-text :deep(td) {
-  border: 1px solid var(--border-light);
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.qa-text :deep(th) {
-  background-color: var(--bg-tertiary);
-  font-weight: 600;
-}
-
-.qa-text :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 0.75em 0;
-}
-
-.qa-text :deep(del) {
-  text-decoration: line-through;
-  opacity: 0.7;
-}
-
-.qa-question .qa-text {
-  background-color: var(--bg-secondary);
-}
-
-.qa-answer .qa-text {
-  background-color: var(--bg-primary);
-  border-color: var(--border-light);
-}
-
-/* 对话模式样式 */
-.conversation-content {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 80px);
-  max-height: 900px;
-}
-
-.conversation-header {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--border-light);
-  margin-bottom: 24px;
-}
-
-.conversation-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.conversation-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.conversation-date {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.message-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.message-item.user {
-  align-items: flex-end;
-}
-
-.message-item.assistant {
-  align-items: flex-start;
-}
-
-.message-content {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-light);
-}
-
-.message-item.user .message-content {
-  background-color: var(--accent-blue);
-  color: white;
-  border-color: var(--accent-blue);
-}
-
-.message-text {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-primary);
-}
-
-.message-item.user .message-text {
-  color: white;
-}
-
-.message-text :deep(p) {
-  margin: 0 0 8px 0;
-}
-
-.message-text :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.message-text :deep(ul), .message-text :deep(ol) {
-  margin: 8px 0;
-  padding-left: 20px;
-}
-
-.message-text :deep(li) {
-  margin: 4px 0;
-}
-
-/* 隐藏"查看原片"前的图片（消息列表区域） */
-.message-text :deep(.hidden-original-image) {
-  display: none !important;
-}
-
-/* "查看原片"链接悬浮显示缩略图（消息列表区域） */
-.message-text :deep(.hover-image-link) {
-  position: relative;
-}
-
-.message-text :deep(.hover-image-link::after) {
-  content: '';
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  width: 280px;
-  height: 158px;
-  background-image: var(--hover-image-url);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 1000;
-}
-
-.message-text :deep(.hover-image-link:hover::after) {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-12px);
-}
-
-.message-time {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 4px;
-}
-
-.message-item.user .message-time {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.empty-messages {
-  padding: 60px 20px;
-  text-align: center;
-  color: var(--text-secondary);
-  margin-bottom: 40px;
-}
-
-.qa-time {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 6px;
-  padding-left: 16px;
-}
-
-.qa-input-area {
-  margin-top: 24px;
-}
-
-.video-count-selector {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-}
-
-.video-count-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.video-count-input {
-  padding: 6px 12px;
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  outline: none;
-  transition: all 0.2s ease;
-  min-width: 120px;
-  width: 150px;
-}
-
-.video-count-input:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-light);
-}
-
-.video-count-input:hover {
-  border-color: var(--border-medium);
-}
-
-.video-count-input::-webkit-inner-spin-button,
-.video-count-input::-webkit-outer-spin-button {
-  opacity: 1;
-  cursor: pointer;
-}
-
-.video-count-hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-left: auto;
+@media (max-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar__content {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .video-count-selector {
-    flex-wrap: wrap;
-    gap: 8px;
+  .page-shell {
+    flex-direction: column;
   }
-  
-  .video-count-hint {
+
+  .page-shell__actions {
     width: 100%;
-    margin-left: 0;
-  }
-}
-
-.qa-input-container {
-  position: relative;
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.qa-textarea {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid var(--border-light);
-  border-radius: 8px;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  line-height: 1.5;
-  resize: none;
-  transition: all 0.2s ease;
-  outline: none;
-}
-
-.qa-textarea:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-light);
-}
-
-.qa-textarea::placeholder {
-  color: var(--text-tertiary);
-}
-
-.qa-send-btn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 8px;
-  background-color: var(--accent-blue);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  outline: none;
-}
-
-.qa-send-btn:hover:not(:disabled) {
-  background-color: var(--accent-blue-hover);
-  transform: translateY(-1px);
-}
-
-.qa-send-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.qa-send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.qa-loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.qa-hint {
-  margin-top: 8px;
-  padding-left: 4px;
-  font-size: 12px;
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .qa-question,
-  .qa-answer {
-    gap: 8px;
+    justify-content: flex-start;
   }
 
-  .qa-avatar {
-    width: 28px;
-    height: 28px;
+  .message-content {
+    max-width: 100%;
   }
 
-  .qa-avatar svg {
-    width: 16px;
-    height: 16px;
+  .qa-input-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .qa-send-btn {
+    width: 100%;
   }
 }
 </style>
-

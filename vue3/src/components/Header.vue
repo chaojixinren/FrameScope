@@ -1,22 +1,29 @@
 <template>
-  <header class="header">
-    <div class="header-content">
-      <div class="header-left">
-        <h1 class="app-title">视频内容理解</h1>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <div class="app-brand">
+        <div class="brand-mark" aria-hidden="true">◈</div>
+        <div class="brand-text">
+          <div class="brand-title">FrameScope</div>
+          <div class="brand-subtitle">Future Tech Video Console</div>
+        </div>
       </div>
-      <div class="header-right">
-        <!-- 主题切换 -->
+
+      <div class="app-actions">
         <button
-          class="header-btn"
+          type="button"
+          class="btn btn--ghost icon-btn"
           @click="toggleTheme"
+          :aria-pressed="themeStore.theme === 'dark'"
           :title="themeStore.theme === 'light' ? '切换到深色模式' : '切换到浅色模式'"
         >
           <svg
             v-if="themeStore.theme === 'light'"
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 20 20"
             fill="none"
+            aria-hidden="true"
           >
             <path
               d="M10 3V1M10 19V17M17 10H19M1 10H3M15.657 15.657L17.071 17.071M2.929 2.929L4.343 4.343M15.657 4.343L17.071 2.929M2.929 17.071L4.343 15.657M14 10C14 12.2091 12.2091 14 10 14C7.79086 14 6 12.2091 6 10C6 7.79086 7.79086 6 10 6C12.2091 6 14 7.79086 14 10Z"
@@ -27,10 +34,11 @@
           </svg>
           <svg
             v-else
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 20 20"
             fill="none"
+            aria-hidden="true"
           >
             <path
               d="M10 3C11.3807 3 12.5 4.11929 12.5 5.5C12.5 6.88071 11.3807 8 10 8C8.61929 8 7.5 6.88071 7.5 5.5C7.5 4.11929 8.61929 3 10 3Z"
@@ -47,13 +55,16 @@
           </svg>
         </button>
 
-        <!-- 用户信息 -->
-        <div class="user-menu" v-if="userStore.isAuthenticated">
-          <div class="user-info">
-            <span class="username">{{ userStore.user?.username || '用户' }}</span>
-          </div>
-          <button class="header-btn logout-btn" @click="handleLogout" title="退出登录">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <div v-if="userStore.isAuthenticated" class="user-chip">
+          <span class="user-name">{{ userStore.user?.username || '用户' }}</span>
+          <button
+            type="button"
+            class="btn btn--ghost icon-btn"
+            @click="handleLogout"
+            title="退出登录"
+            aria-label="退出登录"
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path
                 d="M7 17L12 12L7 7M12 12H2"
                 stroke="currentColor"
@@ -89,83 +100,100 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-.header {
-  height: 60px;
-  background-color: var(--bg-primary);
-  border-bottom: 1px solid var(--border-light);
+.app-header {
   position: sticky;
   top: 0;
   z-index: 100;
+  background: var(--shell-bg);
+  border-bottom: 1px solid var(--shell-border);
+  backdrop-filter: blur(16px);
 }
 
-.header-content {
-  height: 100%;
+.app-header__inner {
+  height: 64px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.app-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.header-right {
+.app-brand {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.header-btn {
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: var(--primary);
+  background: linear-gradient(135deg, rgba(91, 212, 255, 0.18), rgba(139, 123, 255, 0.18));
+  border: 1px solid rgba(91, 212, 255, 0.4);
+  box-shadow: var(--glow-1);
 }
 
-.header-btn:hover {
-  background-color: var(--hover-bg);
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
-.user-menu {
+.brand-subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.app-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.user-chip {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-left: 12px;
-  border-left: 1px solid var(--border-light);
+  border-left: 1px solid var(--shell-border);
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
+.user-name {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
-.username {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
+@media (max-width: 768px) {
+  .app-header__inner {
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-.logout-btn {
-  margin-left: 4px;
+  .app-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>
-

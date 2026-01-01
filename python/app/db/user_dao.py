@@ -151,3 +151,5 @@ def verify_user_password(user: User, password: str) -> bool:
     """
     return verify_password(password, user.password)
 
+
+

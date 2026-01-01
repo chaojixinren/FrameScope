@@ -1,12 +1,14 @@
 <template>
-  <router-view />
+  <div class="app-root">
+    <router-view />
+  </div>
 </template>
 
-<script setup lang="ts">
-// 根组件仅作为路由视图容器
-</script>
+<script setup lang="ts"></script>
 
-<style>
-/* 全局样式在 theme.css 中定义 */
+<style scoped>
+.app-root {
+  width: 100%;
+  height: 100%;
+}
 </style>
-

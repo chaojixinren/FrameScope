@@ -1,16 +1,21 @@
 <template>
-  <aside
-    class="sidebar"
-    :class="{ collapsed: isCollapsed }"
-  >
+  <aside class="sidebar" :class="{ collapsed: isCollapsed }" aria-label="对话导航">
     <div class="sidebar-header">
       <button
-        v-if="!isCollapsed"
-        class="sidebar-toggle"
+        type="button"
+        class="btn btn--ghost icon-btn sidebar-toggle"
         @click="toggleCollapse"
-        title="收起"
+        :aria-pressed="isCollapsed"
+        :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <svg
+          v-if="!isCollapsed"
+          width="18"
+          height="18"
+          viewBox="0 0 20 20"
+          fill="none"
+          aria-hidden="true"
+        >
           <path
             d="M6 4L14 10L6 16V4Z"
             stroke="currentColor"
@@ -19,14 +24,14 @@
             stroke-linejoin="round"
           />
         </svg>
-      </button>
-      <button
-        v-else
-        class="sidebar-toggle"
-        @click="toggleCollapse"
-        title="展开"
-      >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <svg
+          v-else
+          width="18"
+          height="18"
+          viewBox="0 0 20 20"
+          fill="none"
+          aria-hidden="true"
+        >
           <path
             d="M14 4L6 10L14 16V4Z"
             stroke="currentColor"
@@ -36,48 +41,51 @@
           />
         </svg>
       </button>
-      <h2 v-if="!isCollapsed" class="sidebar-title">对话历史</h2>
+      <div v-if="!isCollapsed" class="sidebar-title">
+        <div class="sidebar-title__main">对话历史</div>
+        <div class="sidebar-title__sub">Conversation Timeline</div>
+      </div>
     </div>
 
     <div v-if="!isCollapsed" class="sidebar-content">
-      <button
-        class="new-task-btn"
-        @click="createNewConversation"
-        :disabled="loading"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M8 3V13M3 8H13"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
-        {{ loading ? '加载中...' : '新建对话' }}
-      </button>
-
-      <div class="task-list">
-        <div
-          v-for="conversation in conversations"
-          :key="conversation.id"
-          class="task-item"
-          :class="{ active: currentConversation?.id === conversation.id }"
-          @click="selectConversation(conversation)"
-        >
-          <div class="task-item-header">
-            <span class="task-title">{{ conversation.title || '未命名对话' }}</span>
-            <span v-if="conversation.message_count" class="task-status completed">
-              {{ conversation.message_count }}条
-            </span>
-          </div>
-          <div class="task-meta">
-            {{ formatDate(conversation.updated_at) }}
-          </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section__title">
+          <span>最近对话</span>
+          <span class="badge">{{ conversations.length }}</span>
         </div>
 
-        <div v-if="!loading && conversations.length === 0" class="empty-state">
-          <p class="text-secondary">暂无对话</p>
-          <p class="text-tertiary">点击"新建对话"开始</p>
+        <div v-if="loading && conversations.length === 0" class="task-skeleton">
+          <div class="skeleton skeleton-item"></div>
+          <div class="skeleton skeleton-item"></div>
+          <div class="skeleton skeleton-item"></div>
+        </div>
+
+        <div v-else class="task-list" role="list">
+          <button
+            v-for="conversation in conversations"
+            :key="conversation.id"
+            type="button"
+            class="task-item"
+            :class="{ active: currentConversation?.id === conversation.id }"
+            :aria-current="currentConversation?.id === conversation.id ? 'page' : undefined"
+            @click="selectConversation(conversation)"
+          >
+            <div class="task-item__top">
+              <span class="task-title">{{ conversation.title || '未命名对话' }}</span>
+              <span v-if="conversation.message_count" class="tag">
+                {{ conversation.message_count }} 条
+              </span>
+            </div>
+            <div class="task-meta">{{ formatDate(conversation.updated_at) }}</div>
+          </button>
+        </div>
+
+        <div v-if="!loading && conversations.length === 0" class="panel empty-panel">
+          <div class="panel__bd empty-state">
+            <div class="empty-icon" aria-hidden="true">⎔</div>
+            <div class="empty-title">暂无对话</div>
+            <div class="empty-desc">创建一个新对话开始分析</div>
+          </div>
         </div>
       </div>
     </div>
@@ -103,14 +111,10 @@ const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
 }
 
-const createNewConversation = () => {
-  router.push({ name: 'Home' })
-}
-
 const selectConversation = (conversation: Conversation) => {
   conversationStore.setCurrentConversation(conversation)
-  router.push({ 
-    name: 'Task', 
+  router.push({
+    name: 'Task',
     params: { id: `conversation_${conversation.id}` },
     query: { conversationId: conversation.id }
   })
@@ -136,7 +140,6 @@ const formatDate = (dateString: string) => {
   }
 }
 
-// 组件挂载时加载对话列表
 onMounted(async () => {
   try {
     await conversationStore.loadConversations()
@@ -148,151 +151,111 @@ onMounted(async () => {
 
 <style scoped>
 .sidebar {
-  width: 260px;
+  width: 280px;
   height: 100vh;
-  background-color: var(--bg-secondary);
-  border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
+  background: var(--shell-bg);
+  border-right: 1px solid var(--shell-border);
+  backdrop-filter: blur(18px);
   transition: width 0.2s ease;
   overflow: hidden;
 }
 
 .sidebar.collapsed {
-  width: 60px;
+  width: 64px;
 }
 
 .sidebar-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-3);
   display: flex;
   align-items: center;
   gap: 12px;
+  border-bottom: 1px solid var(--shell-border);
 }
 
-.sidebar-toggle {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.sidebar-toggle:hover {
-  background-color: var(--hover-bg);
-  color: var(--text-primary);
-}
-
-.sidebar-title {
-  font-size: 16px;
+.sidebar-title__main {
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0;
+}
+
+.sidebar-title__sub {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
 }
 
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
-.new-task-btn {
-  width: 100%;
-  padding: 10px 14px;
-  background-color: var(--accent-blue);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+.sidebar-section__title {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.new-task-btn:hover {
-  background-color: var(--accent-blue-hover);
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: var(--space-2);
 }
 
 .task-list {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .task-item {
+  text-align: left;
   padding: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
   border: 1px solid transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .task-item:hover {
-  background-color: var(--hover-bg);
+  transform: translateY(-1px);
+  border-color: rgba(91, 212, 255, 0.35);
+  box-shadow: var(--glow-1);
 }
 
 .task-item.active {
-  background-color: var(--bg-primary);
-  border-color: var(--border-light);
+  border-color: rgba(91, 212, 255, 0.7);
+  background: var(--surface-strong);
 }
 
-.task-item-header {
+.task-item__top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .task-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-primary);
-  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.task-status {
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-.task-status.pending {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-}
-
-.task-status.processing {
-  background-color: var(--accent-blue-light);
-  color: var(--accent-blue);
-}
-
-.task-status.completed {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
-}
-
-.task-status.error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
 }
 
 .task-meta {
@@ -300,14 +263,55 @@ onMounted(async () => {
   color: var(--text-tertiary);
 }
 
-.empty-state {
-  padding: 32px 16px;
-  text-align: center;
+.task-skeleton {
+  display: grid;
+  gap: 8px;
 }
 
-.empty-state p {
+.skeleton-item {
+  height: 52px;
+}
+
+.empty-panel {
+  margin-top: var(--space-2);
+}
+
+.empty-state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-icon {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.empty-title {
   font-size: 14px;
-  margin: 4px 0;
+  font-weight: 600;
+}
+
+.empty-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--shell-border);
+  }
+
+  .sidebar.collapsed {
+    width: 100%;
+  }
+
+  .sidebar-content {
+    max-height: 40vh;
+  }
 }
 </style>
-
