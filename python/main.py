@@ -139,7 +139,7 @@ class MultiVideoResponse(BaseModel):
 class ExampleVideoRequest(BaseModel):
     """示例视频处理请求模型"""
     question: str = Field(..., min_length=1, max_length=5000, description="用户问题（例如：这些视频的内容是什么）")
-    video_ids: List[str] = Field(..., min_items=1, description="视频ID列表（例如：['BV1Dk4y1X71E', 'BV1JD4y1z7vc']）")
+    video_ids: List[str] = Field(..., min_length=1, description="视频ID列表（例如：['BV1Dk4y1X71E', 'BV1JD4y1z7vc']）")
     session_id: Optional[str] = Field(None, max_length=255, description="会话ID")
     conversation_id: Optional[int] = Field(None, description="对话ID（可选，如果提供则加载历史消息）")
     model_name: Optional[str] = Field(None, description="GPT 模型名称（可选，不提供则使用默认）")
@@ -330,11 +330,12 @@ async def multi_video_endpoint(
             answer = "抱歉，暂时无法生成总结内容。"
         
         # 返回标准化的响应（使用ResponseWrapper以匹配前端期望的格式）
-        return R.success(data=MultiVideoResponse(
+        response_data = MultiVideoResponse(
             success=True,
             answer=answer,
             metadata=metadata
-        ))
+        )
+        return R.success(data=response_data.model_dump())
         
     except ValueError as e:
         return R.error(code=400, msg=f"输入验证失败: {str(e)}")
@@ -503,11 +504,12 @@ async def example_video_endpoint(
             answer = "抱歉，暂时无法生成总结内容。"
         
         # 返回标准化的响应（使用ResponseWrapper以匹配前端期望的格式）
-        return R.success(data=MultiVideoResponse(
+        response_data = MultiVideoResponse(
             success=True,
             answer=answer,
             metadata=metadata
-        ))
+        )
+        return R.success(data=response_data.model_dump())
         
     except ValueError as e:
         return R.error(code=400, msg=f"输入验证失败: {str(e)}")

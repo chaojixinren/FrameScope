@@ -67,49 +67,6 @@ const canSubmit = computed(() => {
   return !loading.value && form.value.question.trim().length > 0
 })
 
-// 生成模拟任务结果
-const generateMockTaskResult = (_question: string) => {
-  // 参数保留用于未来根据问题生成个性化结果
-  return {
-    commonDescriptions: [
-      '产品外观设计简洁现代',
-      '性能表现稳定可靠',
-      '价格定位在中高端市场',
-      '用户体验整体良好'
-    ],
-    contradictions: [
-      {
-        topic: '电池续航',
-        points: [
-          { video: '视频1', view: '续航可达10小时，完全满足日常使用' },
-          { video: '视频2', view: '续航仅为6小时，重度使用需要频繁充电' }
-        ]
-      },
-      {
-        topic: '性价比',
-        points: [
-          { video: '视频1', view: '性价比很高，值得购买' },
-          { video: '视频2', view: '价格偏高，性价比一般' }
-        ]
-      }
-    ],
-    uniqueFeatures: [
-      {
-        video: '视频1',
-        features: ['强调了快充功能', '提到了特殊材质', '重点介绍了拍照功能']
-      },
-      {
-        video: '视频2',
-        features: ['重点关注了性价比', '提到了竞品对比', '详细分析了游戏性能']
-      },
-      {
-        video: '视频3',
-        features: ['强调了系统流畅度', '提到了生态联动', '详细介绍了屏幕显示效果']
-      }
-    ]
-  }
-}
-
 const handleCreateTask = async () => {
   if (!canSubmit.value) return
 
@@ -125,14 +82,7 @@ const handleCreateTask = async () => {
     // 使用example目录下的默认视频ID列表
     const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
     
-    // 调用后端API：使用example_video接口进行分析
-    const response = await multiVideoApi.queryExample({
-      question: questionText,
-      video_ids: defaultVideoIds,
-      conversation_id: conversation.id
-    })
-    
-    // 生成任务对象
+    // 生成任务对象，状态设为 pending，将在 TaskDetail 页面中处理分析
     const taskId = `task_${Date.now()}`
     const task: Task = {
       id: taskId,
@@ -140,21 +90,15 @@ const handleCreateTask = async () => {
       videoUrls: defaultVideoIds.map(id => `https://www.bilibili.com/video/${id}`),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      status: 'completed',
-      result: generateMockTaskResult(questionText),
-      questions: [{
-        id: `qa_${Date.now()}`,
-        question: questionText,
-        answer: response.answer,
-        createdAt: new Date().toISOString()
-      }]
+      status: 'pending'
     }
     
     // 添加到任务列表
     taskStore.addTask(task)
     taskStore.saveTasks()
     
-    // 跳转到任务详情页，传递 conversationId 和初始问题
+    // 立即跳转到任务详情页，传递 conversationId 和初始问题
+    // TaskDetail 页面将负责调用 API 并更新任务状态
     router.push({
       name: 'Task',
       params: { id: taskId },
@@ -166,7 +110,6 @@ const handleCreateTask = async () => {
   } catch (err: any) {
     error.value = err.message || '创建任务失败，请稍后重试'
     console.error('创建任务失败:', err)
-  } finally {
     loading.value = false
   }
 }

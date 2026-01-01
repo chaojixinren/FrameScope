@@ -42,42 +42,120 @@
         </div>
       </div>
 
-      <!-- AI问答区域（对话形式） -->
-      <div class="section qa-section">
-        <h2 class="section-title">{{ conversationId ? '继续对话' : '开始新对话' }}</h2>
-        <p class="section-description">基于视频内容理解，您可以提问，AI将为您提供深入的分析和解答</p>
-        
-        <!-- 对话消息列表 -->
-        <div v-if="messages.length > 0" class="messages-list" ref="messagesListRef">
-          <div
-            v-for="(msg, index) in messages"
-            :key="`msg-${msg.id || index}-${msg.created_at}`"
-            class="message-item"
-            :class="msg.role"
-          >
-            <div class="message-content">
-              <div class="message-text" v-html="formatAnswer(msg.content)"></div>
-              <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+      <!-- 第一次回答（任务结果） -->
+      <div v-if="firstAnswer || (sendingQuestion && messages.length === 0)" class="section task-result-section">
+        <div class="task-result-content">
+          <!-- 加载中状态 -->
+          <div v-if="sendingQuestion && messages.length === 0" class="task-steps">
+            <div class="task-step">
+              <div class="step-status loading">
+                <div class="loading-spinner-small"></div>
+              </div>
+              <div class="step-content">
+                <div class="step-title">正在获取视频连接......</div>
+              </div>
             </div>
           </div>
           
-          <!-- 发送中状态 -->
-          <div v-if="sendingQuestion" class="message-item assistant">
-            <div class="message-content">
-              <div class="message-text">
-                <div class="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+          <!-- 已完成状态 -->
+          <div v-else-if="firstAnswer" class="task-steps">
+            <!-- 步骤1: 获取视频连接 -->
+            <div class="task-step">
+              <div class="step-status completed">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="step-content">
+                <div class="step-title">正在获取视频连接......</div>
+              </div>
+            </div>
+            
+            <!-- 步骤2: 已获取视频列表 -->
+            <div class="task-step" v-if="currentVideoIds.length > 0">
+              <div class="step-status completed">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="step-content">
+                <div class="step-title">已获取到对应视频：</div>
+                <div class="video-list-container">
+                  <div 
+                    v-for="(videoId, index) in currentVideoIds" 
+                    :key="videoId" 
+                    class="video-item"
+                  >
+                    视频{{ index + 1 }}：<a :href="`https://www.bilibili.com/video/${videoId}`" target="_blank" class="video-link">{{ videoId }}</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 步骤3: 下载并分析 -->
+            <div class="task-step">
+              <div class="step-status completed">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="step-content">
+                <div class="step-title">正在下载并分析视频内容(完成后可点击"视频xx"的标题进入内容展示)......</div>
+              </div>
+            </div>
+            
+            <!-- 步骤4: 分析结果 -->
+            <div class="task-step">
+              <div class="step-status completed">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="step-content">
+                <div class="step-title">已完成视频内容分析：</div>
+                <div class="analysis-result">
+                  <div class="result-content" v-html="formatAnswer(firstAnswer.content)"></div>
                 </div>
               </div>
             </div>
           </div>
+          
+          <div v-if="firstAnswer" class="task-result-time">{{ formatTime(firstAnswer.created_at) }}</div>
+        </div>
+      </div>
+
+      <!-- 后续对话消息列表（显示在"继续对话"上方） -->
+      <div v-if="hasFollowupConversation" class="messages-list">
+        <div
+          v-for="(msg, index) in followupMessages"
+          :key="`msg-${msg.id || index}-${msg.created_at}`"
+          class="message-item"
+          :class="msg.role"
+        >
+          <div class="message-content">
+            <div class="message-text" v-html="formatAnswer(msg.content)"></div>
+            <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+          </div>
         </div>
         
-        <div v-else-if="!sendingQuestion" class="empty-messages">
-          <p class="text-secondary">还没有消息，开始提问吧！</p>
+        <!-- 发送中状态（后续对话时显示） -->
+        <div v-if="sendingQuestion && messages.length > 0" class="message-item assistant">
+          <div class="message-content">
+            <div class="message-text">
+              <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- AI问答区域（对话形式） -->
+      <div class="section qa-section">
+        <h2 class="section-title">{{ conversationId && (firstAnswer || hasFollowupConversation) ? '继续对话' : '开始新对话' }}</h2>
+        <p class="section-description">基于视频内容理解，您可以提问，AI将为您提供深入的分析和解答</p>
 
         <!-- 问题输入区 -->
         <div class="qa-input-area">
@@ -146,25 +224,63 @@ const conversationId = computed(() => {
 
 // 对话消息列表
 const messages = computed(() => conversationStore.currentMessages)
+
+// 第一次回答（第一条AI消息，作为任务结果）
+const firstAnswer = computed(() => {
+  if (messages.value.length >= 2) {
+    const firstUserMsg = messages.value[0]
+    const firstAssistantMsg = messages.value[1]
+    // 确保第一条是用户消息，第二条是AI消息
+    if (firstUserMsg && firstAssistantMsg && firstUserMsg.role === 'user' && firstAssistantMsg.role === 'assistant') {
+      return firstAssistantMsg
+    }
+  }
+  return null
+})
+
+// 后续对话消息（从第三条消息开始）
+const followupMessages = computed(() => {
+  // 如果有第一次回答，则从第三条消息开始是后续对话
+  if (firstAnswer.value && messages.value.length > 2) {
+    return messages.value.slice(2)
+  }
+  return []
+})
+
+// 是否有后续对话
+const hasFollowupConversation = computed(() => followupMessages.value.length > 0)
+
 const loading = ref(false)
 const questionInput = ref('')
 const sendingQuestion = ref(false)
 const deletingConversation = ref(false)
-const messagesListRef = ref<HTMLElement | null>(null)
+// 当前任务的视频ID列表
+const currentVideoIds = ref<string[]>([])
 
-// 自动滚动到底部
+// 自动滚动到底部（使用主页面滚动条）
 const scrollToBottom = () => {
   nextTick(() => {
-    if (messagesListRef.value) {
-      messagesListRef.value.scrollTop = messagesListRef.value.scrollHeight
-    }
+    // 滚动到页面底部
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: 'smooth'
+    })
   })
 }
 
-// 监听消息变化，自动滚动到底部
-watch(messages, () => {
-  scrollToBottom()
+// 监听消息变化，自动滚动到底部（只在后续对话时滚动）
+watch(followupMessages, () => {
+  if (hasFollowupConversation.value) {
+    scrollToBottom()
+  }
 }, { deep: true })
+
+// 监听第一次回答，滚动到底部
+watch(firstAnswer, () => {
+  if (firstAnswer.value) {
+    scrollToBottom()
+  }
+})
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return ''
@@ -206,13 +322,35 @@ const formatAnswer = (answer: string) => {
   // 使用marked解析Markdown格式
   if (!answer) return ''
   try {
-    return marked.parse(answer)
+    let html = marked.parse(answer) as string
+    
+    // 处理图片URL：将后端的绝对URL转换为可访问的相对路径
+    // 后端生成的URL格式可能有问题：http://127.0.0.1:8000:8483/static/screenshots/xxx.jpg（两个端口）
+    // 正常格式：http://localhost:8483/static/screenshots/xxx.jpg
+    // 提取路径部分，使用相对路径（/static/screenshots/xxx.jpg）
+    // 通过Vite代理将/static请求转发到后端服务器
+    html = html.replace(
+      /src=["'](https?:\/\/[^"']*\/static\/screenshots\/[^"']+)["']/gi,
+      (match: string, url: string) => {
+        // 直接使用正则表达式提取路径部分，避免URL解析错误
+        // 这样可以处理格式错误的URL（如包含两个端口号的情况）
+        const pathMatch = url.match(/\/static\/screenshots\/[^"'\s]+/)
+        if (pathMatch) {
+          return `src="${pathMatch[0]}"`
+        }
+        // 如果提取失败，返回原始URL
+        return match
+      }
+    )
+    
+    return html
   } catch (error) {
     console.error('Markdown解析失败:', error)
     // 如果解析失败，返回原始文本（转义HTML以防止XSS）
     return answer.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   }
 }
+
 
 const canSendQuestion = computed(() => {
   return questionInput.value.trim().length > 0 && !sendingQuestion.value
@@ -231,26 +369,6 @@ const handleEnterKey = (event: KeyboardEvent) => {
 
 // 已移除模拟数据生成函数，改用实际 API
 
-// 从视频URL中提取视频ID（B站BV号）
-const extractVideoIds = (videoUrls: string[]): string[] => {
-  const videoIds: string[] = []
-  const bvPattern = /BV[0-9A-Za-z]+/g
-  
-  videoUrls.forEach(url => {
-    const matches = url.match(bvPattern)
-    if (matches) {
-      videoIds.push(...matches)
-    }
-  })
-  
-  // 如果没有从URL中提取到，使用example目录中的默认视频ID列表
-  if (videoIds.length === 0) {
-    return ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
-  }
-  
-  return [...new Set(videoIds)] // 去重
-}
-
 const sendQuestion = async () => {
   if (!canSendQuestion.value) return
 
@@ -261,8 +379,14 @@ const sendQuestion = async () => {
   const currentInput = questionText
   questionInput.value = ''
 
+  // 记录发送前的消息数量，用于错误回滚
+  const messageCountBeforeSend = messages.value.length
+
   try {
     let targetConversationId = conversationId.value
+
+    // 判断是否是第一次回答（消息数量为0时是第一次）
+    const isFirstAnswer = messages.value.length === 0
 
     // 如果没有conversationId，先创建新对话
     if (!targetConversationId) {
@@ -276,22 +400,31 @@ const sendQuestion = async () => {
       })
     }
 
-    // 添加用户消息到本地状态（乐观更新）
-    const userMessage: Message = {
-      id: Date.now(),
-      role: 'user',
-      content: currentInput,
-      created_at: new Date().toISOString()
+    // 只有后续对话才添加用户消息到本地显示列表（第一次回答不显示用户消息，但会保存到后端）
+    if (!isFirstAnswer) {
+      const userMessage: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: currentInput,
+        created_at: new Date().toISOString()
+      }
+      conversationStore.addMessage(userMessage)
     }
-    conversationStore.addMessage(userMessage)
 
-    // 调用后端 API
-    const response = await multiVideoApi.query({
+    // 使用example目录下的默认视频ID列表
+    const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
+    // 保存视频ID列表
+    currentVideoIds.value = defaultVideoIds
+    
+    // 调用后端 API - 使用 example_video 接口（后端会保存用户消息和AI回复）
+    const response = await multiVideoApi.queryExample({
       question: currentInput,
+      video_ids: defaultVideoIds,
       conversation_id: targetConversationId
     })
 
-    // 添加助手回复
+    // 第一次回答时，只添加AI回复到本地（用户消息已由后端保存，不在前端显示）
+    // 后续对话时，用户消息已在上面的if中添加，这里添加AI回复
     const assistantMessage: Message = {
       id: Date.now() + 1,
       role: 'assistant',
@@ -304,6 +437,8 @@ const sendQuestion = async () => {
     scrollToBottom()
 
     // 刷新对话列表和详情（确保数据同步，包括更新后的标题）
+    // 注意：loadConversation会从后端加载所有消息（包括第一次的用户消息），
+    // 但我们的显示逻辑会通过firstAnswer和followupMessages来区分显示
     await conversationStore.loadConversation(targetConversationId)
     await conversationStore.refreshConversations()
     
@@ -318,12 +453,10 @@ const sendQuestion = async () => {
     const errorMessage = error?.response?.data?.detail || error?.message || '发送问题失败，请稍后重试'
     alert(errorMessage)
     
-    // 移除刚才添加的用户消息（回滚乐观更新）
-    if (conversationStore.currentMessages.length > 0) {
-      const lastMessage = conversationStore.currentMessages[conversationStore.currentMessages.length - 1]
-      if (lastMessage && lastMessage.role === 'user' && lastMessage.content === currentInput) {
-        conversationStore.currentMessages.pop()
-      }
+    // 移除刚才添加的消息（回滚乐观更新）
+    // 恢复到发送前的消息数量
+    while (conversationStore.currentMessages.length > messageCountBeforeSend) {
+      conversationStore.currentMessages.pop()
     }
   } finally {
     sendingQuestion.value = false
@@ -360,8 +493,28 @@ onMounted(async () => {
     loading.value = true
     try {
       await conversationStore.loadConversation(conversationId.value)
+      // 如果加载了对话且有第一次回答，但没有视频ID列表，使用默认的video_ids
+      // 这样可以确保从已有对话加载时也能显示视频列表
+      if (firstAnswer.value && currentVideoIds.value.length === 0) {
+        currentVideoIds.value = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
+      }
       // 加载后滚动到底部
       scrollToBottom()
+      
+      // 检查是否有初始问题需要自动发送（新建任务时传递的 question 参数）
+      const initialQuestion = route.query.question as string | undefined
+      if (initialQuestion && conversationStore.currentMessages.length === 0) {
+        // 如果对话中没有消息，自动发送初始问题
+        questionInput.value = initialQuestion
+        // 等待一下确保 UI 更新，然后自动发送
+        await nextTick()
+        await sendQuestion()
+        // 发送后清除 URL 中的 question 参数，避免刷新页面时重复发送
+        router.replace({
+          path: route.path,
+          query: { ...route.query, question: undefined }
+        })
+      }
     } catch (error) {
       console.error('加载对话失败:', error)
     } finally {
@@ -551,6 +704,323 @@ onMounted(async () => {
 
 .section {
   margin-bottom: 40px;
+}
+
+/* 任务结果区域样式 */
+.task-result-section {
+  margin-bottom: 40px;
+}
+
+.task-result-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 32px;
+}
+
+/* 任务步骤样式 */
+.task-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.task-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.step-status {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-status.loading {
+  border: 2px solid var(--border-light);
+  border-top-color: var(--accent-blue);
+  animation: spin 1s linear infinite;
+}
+
+.step-status.completed {
+  background-color: var(--accent-blue);
+  color: white;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.video-list-container {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-item {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.video-link {
+  color: var(--accent-blue);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.video-link:hover {
+  text-decoration: underline;
+}
+
+.analysis-result {
+  margin-top: 12px;
+}
+
+.result-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+
+.result-content :deep(p) {
+  margin: 0.75em 0;
+  line-height: 1.8;
+}
+
+.result-content :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.result-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.result-content :deep(ul),
+.result-content :deep(ol) {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.result-content :deep(li) {
+  margin: 0.25em 0;
+  line-height: 1.8;
+}
+
+.result-content :deep(h1),
+.result-content :deep(h2),
+.result-content :deep(h3),
+.result-content :deep(h4),
+.result-content :deep(h5),
+.result-content :deep(h6) {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.result-content :deep(h1) {
+  font-size: 1.5em;
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom: 0.5em;
+}
+
+.result-content :deep(h2) {
+  font-size: 1.3em;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 0.3em;
+}
+
+.result-content :deep(h3) {
+  font-size: 1.1em;
+}
+
+.result-content :deep(code) {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  color: var(--accent-blue);
+}
+
+.result-content :deep(pre) {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.result-content :deep(pre code) {
+  background-color: transparent;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.result-content :deep(blockquote) {
+  margin: 0.75em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--accent-blue);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.result-content :deep(a) {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.result-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.result-content :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 1.5em 0;
+}
+
+.result-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+}
+
+.result-content :deep(th),
+.result-content :deep(td) {
+  border: 1px solid var(--border-light);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.result-content :deep(th) {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.result-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.75em 0;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.task-result-text {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.task-result-text :deep(p) {
+  margin: 0.75em 0;
+  line-height: 1.8;
+}
+
+.task-result-text :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.task-result-text :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.task-result-text :deep(ul),
+.task-result-text :deep(ol) {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.task-result-text :deep(li) {
+  margin: 0.25em 0;
+  line-height: 1.8;
+}
+
+.task-result-text :deep(h1),
+.task-result-text :deep(h2),
+.task-result-text :deep(h3),
+.task-result-text :deep(h4),
+.task-result-text :deep(h5),
+.task-result-text :deep(h6) {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.task-result-text :deep(code) {
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  color: var(--accent-blue);
+}
+
+.task-result-text :deep(pre) {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.task-result-text :deep(pre code) {
+  background-color: transparent;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.task-result-time {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.task-result-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.task-result-loading .loading-text {
+  color: var(--text-secondary);
+  font-size: 15px;
 }
 
 .section-title {
@@ -780,11 +1250,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-bottom: 24px;
-  max-height: 600px;
-  overflow-y: auto;
+  margin-bottom: 40px;
   padding: 16px 0;
-  scroll-behavior: smooth;
 }
 
 .messages-list .message-item {
@@ -1186,6 +1653,7 @@ onMounted(async () => {
   padding: 60px 20px;
   text-align: center;
   color: var(--text-secondary);
+  margin-bottom: 40px;
 }
 
 .qa-time {
