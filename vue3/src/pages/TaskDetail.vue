@@ -8,7 +8,7 @@
           {{
             conversationStore.currentConversation
               ? formatDate(conversationStore.currentConversation.created_at)
-              : '等待问题输入后创建对话'
+              : '暂无创建时间'
           }}
         </p>
       </div>
@@ -27,41 +27,13 @@
       </div>
     </section>
 
-    <div class="panel toolbar">
-      <div class="panel__bd toolbar__content">
-        <div class="toolbar-group">
-          <label for="message-search">对话检索</label>
-          <input
-            id="message-search"
-            v-model="searchQuery"
-            class="input"
-            placeholder="输入关键词（仅本地筛选）"
-          />
-        </div>
-        <div class="toolbar-meta">
-          <div class="meta-item">
-            <span class="meta-label">状态</span>
-            <span
-              class="tag status-tag"
-              :data-state="sendingQuestion ? 'processing' : firstAnswer ? 'completed' : 'idle'"
-            >
-              {{ sendingQuestion ? '分析中' : firstAnswer ? '已完成' : '待提问' }}
-            </span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">视频数</span>
-            <span class="badge">{{ currentVideos.length || selectedVideoCount }} 个</span>
-          </div>
-        </div>
-        <button type="button" class="btn btn--primary" @click="focusComposer">快速提问</button>
-      </div>
-    </div>
+    
 
     <div v-if="errorMessage" class="panel error-panel">
       <div class="panel__bd error-state">
-        <div class="error-icon" aria-hidden="true">?</div>
+        <div class="error-icon" aria-hidden="true">⚠</div>
         <div>
-          <div class="error-title">操作失败</div>
+          <div class="error-title">出错了</div>
           <div class="error-desc">{{ errorMessage }}</div>
         </div>
       </div>
@@ -77,8 +49,9 @@
       </div>
     </div>
 
-    <div v-else class="content-grid">
-      <aside class="content-left">
+    <div v-else class="content-single">
+      <section class="content-main">
+        <!-- 视频链接卡片 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
@@ -150,9 +123,8 @@
             </div>
           </div>
         </div>
-      </aside>
 
-      <section class="content-right">
+        <!-- 分析结果卡片 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
@@ -227,7 +199,7 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">完成内容解析与摘要输出</div>
+                  <div class="step-title">分析结果已生成</div>
                 </div>
               </div>
 
@@ -236,14 +208,15 @@
             </div>
 
             <div v-else class="empty-state">
-              <div class="empty-icon" aria-hidden="true">?</div>
-              <div class="empty-title">暂未生成结果</div>
-              <div class="empty-desc">提交问题后将自动拉取视频并生成分析。</div>
-              <button type="button" class="btn btn--ghost" @click="focusComposer">立即提问</button>
+              <div class="empty-icon" aria-hidden="true">💭</div>
+              <div class="empty-title">暂无结果</div>
+              <div class="empty-desc">输入问题开始分析视频内容</div>
+              <button type="button" class="btn btn--ghost" @click="focusComposer">开始提问</button>
             </div>
           </div>
         </div>
 
+        <!-- 后续评论 -->
         <div v-if="hasFollowupConversation" class="panel">
           <div class="panel__hd">
             <div>
@@ -416,7 +389,6 @@ const searchingVideos = ref(false)
 const selectedVideoCount = ref<number>(5)
 
 const errorMessage = ref('')
-const searchQuery = ref('')
 const composerRef = ref<HTMLTextAreaElement | null>(null)
 
 // 自动滚动到底部（使用主页面滚动条）
@@ -903,6 +875,42 @@ onMounted(async () => {
   max-width: 720px;
 }
 
+.page-shell__actions .btn--danger {
+  font-weight: 500;
+}
+
+/* 浅色模式：使用深色文字 */
+@media (prefers-color-scheme: light) {
+  .page-shell__actions .btn--danger {
+    color: #991b1b;
+  }
+  
+  .page-shell__actions .btn--danger:hover {
+    color: #7f1d1d;
+  }
+  
+  .page-shell__actions .btn--danger:disabled {
+    color: #991b1b;
+    opacity: 0.6;
+  }
+}
+
+/* 深色模式：使用浅色文字 */
+@media (prefers-color-scheme: dark) {
+  .page-shell__actions .btn--danger {
+    color: #fca5a5;
+  }
+  
+  .page-shell__actions .btn--danger:hover {
+    color: #f87171;
+  }
+  
+  .page-shell__actions .btn--danger:disabled {
+    color: #fca5a5;
+    opacity: 0.6;
+  }
+}
+
 .page-kicker {
   font-size: 12px;
   letter-spacing: 0.6px;
@@ -926,10 +934,10 @@ onMounted(async () => {
 }
 
 .toolbar__content {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
+  display: flex;
   gap: var(--space-3);
-  align-items: end;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .toolbar-group {
@@ -1027,17 +1035,33 @@ onMounted(async () => {
   height: 96px;
 }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
-  gap: var(--space-4);
-}
-
-.content-left,
-.content-right {
+.content-single {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.content-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 100%;
+}
+
+.content-main .panel,
+.error-panel,
+.loading-panel {
+  margin-left: var(--space-4);
+  margin-right: var(--space-4);
+}
+
+.content-main .panel:has(.markdown) {
+  overflow: visible;
+}
+
+.content-main .panel__bd {
+  overflow: visible;
+  position: relative;
 }
 
 .panel-title {
@@ -1224,6 +1248,9 @@ onMounted(async () => {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-light);
   background: var(--surface-2);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .task-result-time {
@@ -1251,6 +1278,9 @@ onMounted(async () => {
   border-radius: 12px;
   border: 1px solid var(--border-light);
   background: var(--surface-3);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .message-item.user .message-content {
@@ -1435,6 +1465,16 @@ onMounted(async () => {
   position: relative;
 }
 
+.markdown {
+  position: relative;
+  overflow: visible;
+}
+
+.markdown :deep(.hover-image-link) {
+  position: relative;
+  z-index: 1;
+}
+
 .markdown :deep(.hover-image-link::after) {
   content: '';
   position: absolute;
@@ -1453,7 +1493,8 @@ onMounted(async () => {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 20;
+  z-index: 9999;
+  box-shadow: var(--shadow-2);
 }
 
 .markdown :deep(.hover-image-link:hover::after) {
@@ -1473,12 +1514,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 1024px) {
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
-
   .toolbar__content {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 

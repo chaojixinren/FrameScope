@@ -23,8 +23,9 @@ def _deduplicate_summary(summary: str) -> str:
     
     策略：
     1. 检测重复的标题（相同或相似的 Markdown 标题）
-    2. 检测重复的段落内容（相似度高的段落）
-    3. 保留第一个出现的，删除后续重复的
+    2. 检测重复的多行段落（完全相同的段落块）
+    3. 检测重复的单行内容（相似度高的单行）
+    4. 保留第一个出现的，删除后续重复的
     
     Args:
         summary: 原始摘要文本
@@ -37,9 +38,19 @@ def _deduplicate_summary(summary: str) -> str:
     
     lines = summary.split('\n')
     seen_headers = {}  # 记录已见过的标题及其位置
-    seen_content = []  # 记录已见过的内容片段
+    seen_content = []  # 记录已见过的内容片段（单行）
+    seen_paragraphs = []  # 记录已见过的多行段落
     result_lines = []
     i = 0
+    
+    def normalize_text(text: str) -> str:
+        """标准化文本用于比较：移除时间戳、特殊字符，转为小写"""
+        # 移除时间戳标记
+        text = re.sub(r'\*?Content-\[\d{2}:\d{2}\](?:-video\d+)?', '', text)
+        text = re.sub(r'\[\[|\]\]', '', text)
+        # 移除特殊字符，只保留中文、英文、数字
+        text = re.sub(r'[^\w\u4e00-\u9fff]+', '', text.lower())
+        return text
     
     while i < len(lines):
         line = lines[i]
@@ -50,8 +61,8 @@ def _deduplicate_summary(summary: str) -> str:
             header_level = len(header_match.group(1))
             header_text = header_match.group(2).strip()
             
-            # 标准化标题文本（去除特殊字符，转为小写）用于比较
-            normalized_header = re.sub(r'[^\w\u4e00-\u9fff]+', '', header_text.lower())
+            # 标准化标题文本用于比较
+            normalized_header = normalize_text(header_text)
             
             # 检查是否已见过相同或相似的标题
             if normalized_header in seen_headers:
@@ -77,14 +88,70 @@ def _deduplicate_summary(summary: str) -> str:
                 i += 1
                 continue
         
-        # 检测重复的列表项或段落
-        # 对于包含时间戳标记的内容，提取核心文本进行比较
+        # 检测多行段落重复（连续的非空行组成段落）
         line_stripped = line.strip()
         if line_stripped:
+            # 收集当前段落（直到遇到空行或标题）
+            paragraph_lines = []
+            j = i
+            while j < len(lines):
+                current_line = lines[j]
+                # 遇到标题，停止收集
+                if re.match(r'^(#{1,6})\s+', current_line.strip()):
+                    break
+                # 遇到空行，可能是段落结束
+                if not current_line.strip():
+                    # 跳过连续的空行，但记录空行位置
+                    break
+                paragraph_lines.append(current_line)
+                j += 1
+            
+            # 判断是单行还是多行段落
+            if len(paragraph_lines) > 1:
+                # 多行段落
+                paragraph_text = '\n'.join(paragraph_lines)
+                paragraph_normalized = normalize_text(paragraph_text)
+                
+                # 对于多行段落，如果长度足够，进行精确匹配检查
+                if len(paragraph_normalized) >= 20:  # 只对足够长的段落进行去重
+                    # 先检查是否完全相同（精确匹配）
+                    if paragraph_normalized in seen_paragraphs:
+                        print(f"[Summary Agent] 检测到重复的多行段落（{len(paragraph_lines)}行），将跳过")
+                        i = j
+                        continue
+                    else:
+                        # 检查是否有高度相似的段落（相似度>90%）
+                        is_duplicate_para = False
+                        for seen_para in seen_paragraphs:
+                            if len(seen_para) > 0:
+                                # 计算相似度：如果一个是另一个的子串，认为是重复
+                                if (paragraph_normalized in seen_para or seen_para in paragraph_normalized):
+                                    similarity = min(len(paragraph_normalized), len(seen_para)) / max(len(paragraph_normalized), len(seen_para))
+                                    if similarity > 0.9:
+                                        is_duplicate_para = True
+                                        print(f"[Summary Agent] 检测到高度相似的多行段落（相似度: {similarity:.2f}），将跳过")
+                                        break
+                        
+                        if is_duplicate_para:
+                            i = j
+                            continue
+                        else:
+                            # 记录新段落
+                            seen_paragraphs.append(paragraph_normalized)
+                            result_lines.extend(paragraph_lines)
+                            i = j
+                            continue
+                else:
+                    # 多行但长度不够，直接添加所有行（不做去重检查，因为短段落重复可能性低）
+                    result_lines.extend(paragraph_lines)
+                    i = j
+                    continue
+            # else: 单行，继续执行单行处理逻辑
+        
+        # 单行内容检测（处理单行或长度不够的多行段落的第一行）
+        if line_stripped:
             # 移除时间戳标记用于比较
-            content_without_timestamp = re.sub(r'\*?Content-\[\d{2}:\d{2}\](?:-video\d+)?', '', line_stripped)
-            content_without_timestamp = re.sub(r'\[\[|\]\]', '', content_without_timestamp)
-            content_normalized = re.sub(r'[^\w\u4e00-\u9fff]+', '', content_without_timestamp.lower())
+            content_normalized = normalize_text(line_stripped)
             
             # 如果内容太短（少于5个字符），可能是格式标记，直接保留
             if len(content_normalized) < 5:
@@ -92,11 +159,16 @@ def _deduplicate_summary(summary: str) -> str:
                 i += 1
                 continue
             
-            # 检查是否与已见过的内容高度相似（相似度>80%）
+            # 检查是否与已见过的内容重复
             is_duplicate = False
             for seen in seen_content:
                 if len(seen) > 0 and len(content_normalized) > 0:
-                    # 简单的相似度检查：如果一个是另一个的子串，或者两者非常相似
+                    # 先检查是否完全相同
+                    if content_normalized == seen:
+                        is_duplicate = True
+                        print(f"[Summary Agent] 检测到完全相同的重复内容，将跳过")
+                        break
+                    # 再检查相似度（相似度>85%）
                     similarity = 0
                     if content_normalized in seen or seen in content_normalized:
                         similarity = min(len(content_normalized), len(seen)) / max(len(content_normalized), len(seen))
@@ -107,7 +179,7 @@ def _deduplicate_summary(summary: str) -> str:
                         if len(total_chars) > 0:
                             similarity = len(common_chars) / len(total_chars)
                     
-                    if similarity > 0.8:
+                    if similarity > 0.85:  # 提高阈值，更严格
                         is_duplicate = True
                         print(f"[Summary Agent] 检测到重复内容，相似度: {similarity:.2f}")
                         break

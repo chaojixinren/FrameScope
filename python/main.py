@@ -266,7 +266,6 @@ async def run_multi_video_query(
         "metadata": None,
         "trace_data": None,
         "max_videos": max_videos,  # 传递最大视频数量
-        "user_provided_urls": video_urls,  # 传递用户提供的URL列表
     }
     
     # Run graph (异步)

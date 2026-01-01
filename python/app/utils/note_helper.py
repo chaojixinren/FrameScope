@@ -1,10 +1,6 @@
 import re
 
 
-import re
-
-import re
-
 def replace_content_markers(markdown: str, video_id: str, platform: str = 'bilibili') -> str:
     """
     替换 *Content-04:16*、Content-04:16 或 Content-[04:16] 为超链接，跳转到对应平台视频的时间位置

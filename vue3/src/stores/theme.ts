@@ -15,6 +15,9 @@ export const useThemeStore = defineStore('theme', () => {
       theme.value = savedTheme
     } else if (systemPrefersDark) {
       theme.value = 'dark'
+    } else {
+      // 默认使用深色模式
+      theme.value = 'dark'
     }
 
     applyTheme(theme.value)

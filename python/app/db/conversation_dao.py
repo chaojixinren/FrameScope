@@ -1,5 +1,7 @@
 from typing import List, Optional
+from sqlalchemy import exists
 from app.db.models.conversation import Conversation
+from app.db.models.message import Message
 from app.db.engine import get_db
 from app.utils.logger import get_logger
 
@@ -39,6 +41,7 @@ def create_conversation(user_id: int, title: str = "") -> Conversation:
 def get_conversations_by_user_id(user_id: int, limit: int = 50, offset: int = 0) -> List[Conversation]:
     """
     获取用户的对话列表（按更新时间倒序）
+    只返回有assistant消息的对话（即已完成的对话）
     
     Args:
         user_id: 用户ID
@@ -46,11 +49,18 @@ def get_conversations_by_user_id(user_id: int, limit: int = 50, offset: int = 0)
         offset: 偏移量
         
     Returns:
-        List[Conversation]: 对话列表
+        List[Conversation]: 对话列表（只包含有assistant消息的对话）
     """
     db = next(get_db())
     try:
-        return db.query(Conversation).filter_by(user_id=user_id).order_by(
+        # 只返回有assistant消息的对话（即已完成的对话）
+        # 使用EXISTS子查询检查是否存在assistant消息
+        return db.query(Conversation).filter_by(user_id=user_id).filter(
+            exists().where(
+                (Message.conversation_id == Conversation.id) & 
+                (Message.role == "assistant")
+            )
+        ).order_by(
             Conversation.updated_at.desc()
         ).offset(offset).limit(limit).all()
     finally:
@@ -135,17 +145,24 @@ def delete_conversation(conversation_id: int) -> bool:
 
 def get_conversation_count_by_user_id(user_id: int) -> int:
     """
-    获取用户的对话数量
+    获取用户的对话数量（只统计有assistant消息的对话）
     
     Args:
         user_id: 用户ID
         
     Returns:
-        int: 对话数量
+        int: 对话数量（只统计已完成的对话）
     """
     db = next(get_db())
     try:
-        return db.query(Conversation).filter_by(user_id=user_id).count()
+        # 只统计有assistant消息的对话
+        # 使用EXISTS子查询检查是否存在assistant消息
+        return db.query(Conversation).filter_by(user_id=user_id).filter(
+            exists().where(
+                (Message.conversation_id == Conversation.id) & 
+                (Message.role == "assistant")
+            )
+        ).count()
     finally:
         db.close()
 
