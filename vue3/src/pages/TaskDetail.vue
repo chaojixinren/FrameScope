@@ -2,13 +2,13 @@
   <div class="task-detail-page">
     <section class="page-shell">
       <div class="page-shell__main">
-        <div class="page-kicker">????</div>
-        <h1 class="page-title">{{ conversationStore.currentConversation?.title || '???' }}</h1>
+        <div class="page-kicker">任务中心</div>
+        <h1 class="page-title">{{ conversationStore.currentConversation?.title || '新对话' }}</h1>
         <p class="page-subtitle">
           {{
             conversationStore.currentConversation
               ? formatDate(conversationStore.currentConversation.created_at)
-              : '???????????'
+              : '等待问题输入后创建对话'
           }}
         </p>
       </div>
@@ -22,7 +22,7 @@
           @click="handleDeleteConversation"
         >
           <span v-if="deletingConversation" class="btn__spinner" aria-hidden="true"></span>
-          ????
+          删除对话
         </button>
       </div>
     </section>
@@ -30,30 +30,30 @@
     <div class="panel toolbar">
       <div class="panel__bd toolbar__content">
         <div class="toolbar-group">
-          <label for="message-search">????</label>
+          <label for="message-search">对话检索</label>
           <input
             id="message-search"
             v-model="searchQuery"
             class="input"
-            placeholder="????????????"
+            placeholder="输入关键词（仅本地筛选）"
           />
         </div>
         <div class="toolbar-meta">
           <div class="meta-item">
-            <span class="meta-label">??</span>
+            <span class="meta-label">状态</span>
             <span
               class="tag status-tag"
               :data-state="sendingQuestion ? 'processing' : firstAnswer ? 'completed' : 'idle'"
             >
-              {{ sendingQuestion ? '???' : firstAnswer ? '???' : '???' }}
+              {{ sendingQuestion ? '分析中' : firstAnswer ? '已完成' : '待提问' }}
             </span>
           </div>
           <div class="meta-item">
-            <span class="meta-label">???</span>
-            <span class="badge">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
+            <span class="meta-label">视频数</span>
+            <span class="badge">{{ currentVideos.length || selectedVideoCount }} 个</span>
           </div>
         </div>
-        <button type="button" class="btn btn--primary" @click="focusComposer">????</button>
+        <button type="button" class="btn btn--primary" @click="focusComposer">快速提问</button>
       </div>
     </div>
 
@@ -61,14 +61,16 @@
       <div class="panel__bd error-state">
         <div class="error-icon" aria-hidden="true">?</div>
         <div>
-          <div class="error-title">????</div>
+          <div class="error-title">操作失败</div>
           <div class="error-desc">{{ errorMessage }}</div>
         </div>
       </div>
     </div>
 
     <div v-if="loading" class="panel loading-panel">
-      <div class="panel__bd loading-state">
+      <div class="panel__bd loading-state" role="status" aria-live="polite">
+        <div class="loading-orbit" aria-hidden="true"></div>
+        <div class="loading-text">正在加载对话...</div>
         <div class="skeleton skeleton-line"></div>
         <div class="skeleton skeleton-block"></div>
         <div class="skeleton skeleton-block"></div>
@@ -80,14 +82,14 @@
         <div class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????????????</p>
+              <h2 class="panel-title">对话概览</h2>
+              <p class="panel-subtitle">当前任务的关键信息概览。</p>
             </div>
             <span class="badge">Console</span>
           </div>
           <div class="panel__bd meta-list">
             <div class="meta-row">
-              <span class="meta-label">????</span>
+              <span class="meta-label">创建时间</span>
               <span class="meta-value">
                 {{
                   conversationStore.currentConversation
@@ -97,17 +99,17 @@
               </span>
             </div>
             <div class="meta-row">
-              <span class="meta-label">????</span>
+              <span class="meta-label">当前状态</span>
               <span class="meta-value">
-                {{ sendingQuestion ? '???' : firstAnswer ? '???' : '????' }}
+                {{ sendingQuestion ? '分析中' : firstAnswer ? '已完成' : '待提问' }}
               </span>
             </div>
             <div class="meta-row">
-              <span class="meta-label">????</span>
-              <span class="meta-value">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
+              <span class="meta-label">视频数量</span>
+              <span class="meta-value">{{ currentVideos.length || selectedVideoCount }} 个</span>
             </div>
             <div class="meta-row">
-              <span class="meta-label">?? ID</span>
+              <span class="meta-label">对话 ID</span>
               <span class="meta-value">#{{ conversationId || '?' }}</span>
             </div>
           </div>
@@ -116,27 +118,35 @@
         <div class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????????????</p>
+              <h2 class="panel-title">视频列表</h2>
+              <p class="panel-subtitle">本次分析使用的视频集合。</p>
             </div>
           </div>
           <div class="panel__bd">
-            <div v-if="currentVideoIds.length > 0" class="video-list">
+            <div v-if="searchingVideos" class="empty-inline">
+              <div class="loading-orbit" aria-hidden="true"></div>
+              <div>正在获取视频列表...</div>
+            </div>
+            <div v-else-if="currentVideos.length > 0" class="video-list">
               <a
-                v-for="(videoId, index) in currentVideoIds"
-                :key="videoId"
+                v-for="(video, index) in currentVideos"
+                :key="video.url || `video-${index}`"
                 class="video-item"
-                :href="`https://www.bilibili.com/video/${videoId}`"
+                :href="video.url"
                 target="_blank"
                 rel="noopener"
               >
                 <span class="video-index">{{ index + 1 }}</span>
-                <span class="video-id">{{ videoId }}</span>
+                <div class="video-main">
+                  <div class="video-title">{{ video.title || video.url }}</div>
+                  <div class="video-desc">{{ video.description || '暂无简介' }}</div>
+                  <div class="video-link">{{ video.url }}</div>
+                </div>
               </a>
             </div>
             <div v-else class="empty-inline">
               <div class="empty-icon" aria-hidden="true">?</div>
-              <div>????????</div>
+              <div>尚未获取视频列表</div>
             </div>
           </div>
         </div>
@@ -146,19 +156,38 @@
         <div class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">??????????</p>
+              <h2 class="panel-title">分析结果</h2>
+              <p class="panel-subtitle">任务执行与内容摘要。</p>
             </div>
             <span class="tag">Analysis</span>
           </div>
           <div class="panel__bd">
             <div v-if="sendingQuestion && messages.length === 0" class="task-steps">
               <div class="task-step">
+                <div class="step-status" :class="searchingVideos ? 'loading' : 'completed'">
+                  <div v-if="searchingVideos" class="loading-spinner-small"></div>
+                  <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">
+                    {{ searchingVideos ? '正在获取视频链接...' : '已获取视频链接' }}
+                  </div>
+                  <div v-if="currentVideos.length > 0" class="video-list-inline">
+                    <span v-for="(video, index) in currentVideos" :key="video.url || `video-${index}`" class="video-chip">
+                      视频 {{ index + 1 }} · {{ video.title || video.url }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="task-step">
                 <div class="step-status loading">
                   <div class="loading-spinner-small"></div>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">????????...</div>
+                  <div class="step-title">{{ searchingVideos ? '等待视频检索完成' : '正在生成分析结果...' }}</div>
                 </div>
               </div>
             </div>
@@ -171,21 +200,21 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????</div>
+                  <div class="step-title">已获取视频链接</div>
                 </div>
               </div>
 
-              <div class="task-step" v-if="currentVideoIds.length > 0">
+              <div class="task-step" v-if="currentVideos.length > 0">
                 <div class="step-status completed">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????</div>
+                  <div class="step-title">已识别相关视频</div>
                   <div class="video-list-inline">
-                    <span v-for="(videoId, index) in currentVideoIds" :key="videoId" class="video-chip">
-                      ?? {{ index + 1 }} ? {{ videoId }}
+                    <span v-for="(video, index) in currentVideos" :key="video.url || `video-${index}`" class="video-chip">
+                      视频 {{ index + 1 }} · {{ video.title || video.url }}
                     </span>
                   </div>
                 </div>
@@ -198,7 +227,7 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????????</div>
+                  <div class="step-title">完成内容解析与摘要输出</div>
                 </div>
               </div>
 
@@ -208,9 +237,9 @@
 
             <div v-else class="empty-state">
               <div class="empty-icon" aria-hidden="true">?</div>
-              <div class="empty-title">??????</div>
-              <div class="empty-desc">??????????????????</div>
-              <button type="button" class="btn btn--ghost" @click="focusComposer">????</button>
+              <div class="empty-title">暂未生成结果</div>
+              <div class="empty-desc">提交问题后将自动拉取视频并生成分析。</div>
+              <button type="button" class="btn btn--ghost" @click="focusComposer">立即提问</button>
             </div>
           </div>
         </div>
@@ -218,8 +247,8 @@
         <div v-if="hasFollowupConversation" class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????? AI ???</p>
+              <h2 class="panel-title">对话记录</h2>
+              <p class="panel-subtitle">后续提问与 AI 回答。</p>
             </div>
           </div>
           <div class="panel__bd">
@@ -239,7 +268,7 @@
               <div v-if="sendingQuestion && messages.length > 0" class="message-item assistant">
                 <div class="message-content">
                   <div class="message-text">
-                    <div class="typing-indicator" aria-label="??????">
+                    <div class="typing-indicator" aria-label="正在生成回答">
                       <span></span>
                       <span></span>
                       <span></span>
@@ -255,15 +284,15 @@
           <div class="panel__hd">
             <div>
               <h2 class="panel-title">
-                {{ conversationId && (firstAnswer || hasFollowupConversation) ? '????' : '????' }}
+                {{ conversationId && (firstAnswer || hasFollowupConversation) ? '继续对话' : '开始对话' }}
               </h2>
-              <p class="panel-subtitle">??????????????????</p>
+              <p class="panel-subtitle">基于结果继续追问，获得更深入的分析。</p>
             </div>
           </div>
           <div class="panel__bd">
             <div class="qa-input-area">
               <div v-if="!conversationId || messages.length === 0" class="video-count-selector">
-                <label for="video-count-input" class="video-count-label">??????</label>
+                <label for="video-count-input" class="video-count-label">分析视频数量</label>
                 <input
                   id="video-count-input"
                   v-model.number="selectedVideoCount"
@@ -271,22 +300,22 @@
                   class="input video-count-input"
                   min="1"
                   max="20"
-                  placeholder="????????1-20?"
+                  placeholder="请输入视频数量（1-20）"
                   aria-describedby="video-count-hint"
                 />
                 <span id="video-count-hint" class="video-count-hint">
-                  ???????????????????? 3-10 ??
+                  系统将搜索并分析指定数量的相关视频（建议 3-10 个）
                 </span>
               </div>
 
               <div class="qa-input-container">
-                <label class="sr-only" for="question-textarea">????</label>
+                <label class="sr-only" for="question-textarea">输入问题</label>
                 <textarea
                   id="question-textarea"
                   ref="composerRef"
                   v-model="questionInput"
                   class="textarea qa-textarea"
-                  placeholder="?????????????A7M4??????"
+                  placeholder="请输入你的问题，例如：索尼A7M4相机怎么样？"
                   rows="3"
                   @keydown.enter.prevent="handleEnterKey"
                   aria-describedby="qa-hint"
@@ -317,7 +346,7 @@
                   <span v-else class="btn__spinner" aria-hidden="true"></span>
                 </button>
               </div>
-              <div id="qa-hint" class="qa-hint">? Enter ???Shift + Enter ??</div>
+              <div id="qa-hint" class="qa-hint">按 Enter 发送，Shift + Enter 换行</div>
             </div>
           </div>
         </div>
@@ -330,7 +359,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
-import { multiVideoApi, type MultiVideoResponse } from '@/api/multi_video'
+import { multiVideoApi, type MultiVideoResponse, type VideoInfo } from '@/api/multi_video'
 import { marked } from 'marked'
 
 // 配置marked选项
@@ -380,8 +409,9 @@ const loading = ref(false)
 const questionInput = ref('')
 const sendingQuestion = ref(false)
 const deletingConversation = ref(false)
-// 当前任务的视频ID列表
-const currentVideoIds = ref<string[]>([])
+// 当前任务的视频信息列表
+const currentVideos = ref<VideoInfo[]>([])
+const searchingVideos = ref(false)
 // 选择的视频数量（默认5个，可以从URL参数中获取）
 const selectedVideoCount = ref<number>(5)
 
@@ -704,18 +734,39 @@ const sendQuestion = async () => {
     // 后续对话的用户消息也会由后端保存，然后通过 loadConversation 统一加载
 
     let response: MultiVideoResponse
+    let prefetchedVideos: VideoInfo[] | undefined
+    let prefetchedQuery: string | undefined
     
     if (isFirstAnswer) {
-      // 第一次回答：使用 multi_video 接口（自动搜索相关视频）
+      // 第一次回答：先执行 video_search，优先返回视频列表给前端渲染
+      currentVideos.value = []
       const maxVideosToUse = selectedVideoCount.value || 5
       console.log('发送API请求，视频数量:', maxVideosToUse, '提取的URL数量:', extractedUrls.length)
       
-      // 使用清理后的问题文本，并传递提取的URL
+      searchingVideos.value = true
+      try {
+        const searchResult = await multiVideoApi.searchVideos({
+          question: cleanedQuestion || currentInput,
+          max_videos: maxVideosToUse,
+          video_urls: extractedUrls.length > 0 ? extractedUrls : undefined
+        })
+        prefetchedVideos = searchResult.video_urls || []
+        prefetchedQuery = searchResult.search_query
+        currentVideos.value = prefetchedVideos
+      } catch (error) {
+        console.error('视频搜索失败:', error)
+      } finally {
+        searchingVideos.value = false
+      }
+      
+      // 使用预取的视频结果继续完整分析流程，避免重复搜索
       response = await multiVideoApi.query({
         question: cleanedQuestion || currentInput, // 如果清理后为空，使用原始文本
         conversation_id: targetConversationId,
         max_videos: maxVideosToUse,
-        video_urls: extractedUrls.length > 0 ? extractedUrls : undefined
+        video_urls: extractedUrls.length > 0 ? extractedUrls : undefined,
+        prefetched_videos: prefetchedVideos && prefetchedVideos.length > 0 ? prefetchedVideos : undefined,
+        search_query: prefetchedQuery
       })
     } else {
       // 后续对话：使用 multi_video 接口（根据上下文进行正常对话）
@@ -724,6 +775,10 @@ const sendQuestion = async () => {
         conversation_id: targetConversationId,
         video_urls: extractedUrls.length > 0 ? extractedUrls : undefined
       })
+    }
+
+    if (response.video_urls && response.video_urls.length > 0 && currentVideos.value.length === 0) {
+      currentVideos.value = response.video_urls
     }
 
     // 后端已经保存了用户消息和助手回复，直接重新加载对话即可
@@ -795,11 +850,6 @@ onMounted(async () => {
     loading.value = true
     try {
       await conversationStore.loadConversation(conversationId.value)
-      // 如果加载了对话且有第一次回答，但没有视频ID列表，使用默认的video_ids
-      // 这样可以确保从已有对话加载时也能显示视频列表
-      if (firstAnswer.value && currentVideoIds.value.length === 0) {
-        currentVideoIds.value = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
-      }
       // 加载后滚动到底部
       scrollToBottom()
       
@@ -951,6 +1001,22 @@ onMounted(async () => {
 .loading-state {
   display: grid;
   gap: 12px;
+  justify-items: start;
+}
+
+.loading-orbit {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--primary);
+  box-shadow: var(--glow-1);
+  animation: spin 0.9s linear infinite;
+}
+
+.loading-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .skeleton-line {
@@ -1015,8 +1081,8 @@ onMounted(async () => {
 
 .video-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(91, 212, 255, 0.2);
@@ -1042,8 +1108,31 @@ onMounted(async () => {
   background: rgba(91, 212, 255, 0.16);
 }
 
-.video-id {
+.video-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.video-title {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.video-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-link {
+  font-size: 11px;
+  color: var(--text-tertiary);
   word-break: break-all;
 }
 
@@ -1123,6 +1212,10 @@ onMounted(async () => {
   background: rgba(91, 212, 255, 0.12);
   border: 1px solid rgba(91, 212, 255, 0.3);
   color: var(--primary);
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .analysis-result {

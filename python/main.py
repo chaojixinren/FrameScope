@@ -29,6 +29,7 @@ agent_path = Path(__file__).parent / "agent"
 sys.path.insert(0, str(agent_path))
 
 from agent.graphs.agent_graph import build_multi_video_graph, build_example_video_graph
+from agent.graphs.node.video_search_node import video_search_node
 from agent.graphs.state import AIState
 from app.db.conversation_dao import create_conversation, get_conversation_by_id, update_conversation_title
 from app.db.message_dao import create_message, get_messages_by_conversation_id
@@ -107,6 +108,11 @@ class MultiVideoRequest(BaseModel):
     provider_id: Optional[str] = Field(None, description="提供商 ID（可选，不提供则使用默认）")
     max_videos: Optional[int] = Field(5, ge=1, le=20, description="最大视频数量（可选，默认5，范围1-20）")
     video_urls: Optional[List[str]] = Field(None, description="用户提供的视频URL列表（可选，如果提供则优先使用这些URL）")
+    prefetched_videos: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="客户端预取的视频搜索结果（每项包含 url/title/description）"
+    )
+    search_query: Optional[str] = Field(None, description="预取结果使用的扩展检索词")
     
     @field_validator('question')
     @classmethod
@@ -132,6 +138,24 @@ class MultiVideoResponse(BaseModel):
     success: bool
     answer: str
     metadata: Optional[Dict[str, Any]] = None  # 包含视频数量、处理时间等信息
+    video_urls: Optional[List[Dict[str, Any]]] = None
+    search_query: Optional[str] = None
+
+
+class VideoSearchRequest(BaseModel):
+    """视频搜索请求模型（仅执行 video_search_node）"""
+    question: str = Field(..., min_length=1, max_length=5000, description="用户问题（例如：某品牌的相机怎么样）")
+    max_videos: Optional[int] = Field(5, ge=1, le=20, description="最大视频数量（可选，默认5，范围1-20）")
+    video_urls: Optional[List[str]] = Field(None, description="用户提供的视频URL列表（可选）")
+
+    @field_validator('question')
+    @classmethod
+    def validate_question(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("问题不能为空")
+        if len(set(v)) < 3 and len(v) > 100:
+            raise ValueError("问题内容无效")
+        return v.strip()
 
 
 class ExampleVideoRequest(BaseModel):
@@ -171,6 +195,8 @@ async def run_multi_video_query(
     provider_id: str = None,
     max_videos: int = 5,
     video_urls: Optional[List[str]] = None,
+    prefetched_videos: Optional[List[Dict[str, Any]]] = None,
+    search_query: Optional[str] = None,
 ) -> MultiVideoState:
     """
     运行多视频搜索和总结查询
@@ -229,8 +255,8 @@ async def run_multi_video_query(
         "session_id": session_id,
         "history": history,
         "timestamp": None,
-        "video_urls": [],
-        "search_query": None,
+        "video_urls": prefetched_videos or [],
+        "search_query": search_query,
         "note_results": [],
         "model_name": model_name,
         "provider_id": provider_id,
@@ -289,6 +315,39 @@ async def run_multi_video_query(
     return result
 
 
+@app.post("/api/video_search")
+async def video_search_endpoint(
+    request: VideoSearchRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    仅执行 video_search_node，用于提前返回视频标题/简介/URL
+    """
+    try:
+        max_videos_to_use = request.max_videos if request.max_videos is not None else 5
+        state: MultiVideoState = {
+            "question": request.question,
+            "video_urls": [],
+            "search_query": None,
+            "max_videos": max_videos_to_use,
+            "user_provided_urls": request.video_urls,
+        }
+
+        result = video_search_node(state)
+        response_data = {
+            "video_urls": result.get("video_urls", []),
+            "search_query": result.get("search_query")
+        }
+        return R.success(data=response_data)
+    except ValueError as e:
+        return R.error(code=400, msg=f"输入验证失败: {str(e)}")
+    except Exception as e:
+        error_detail = str(e)
+        logger.error(f"Error in video_search_endpoint: {error_detail}")
+        traceback.print_exc()
+        return R.error(code=500, msg=f"处理失败: {error_detail}")
+
+
 @app.post("/api/multi_video")
 async def multi_video_endpoint(
     request: MultiVideoRequest,
@@ -330,11 +389,15 @@ async def multi_video_endpoint(
             provider_id=request.provider_id,
             max_videos=max_videos_to_use,
             video_urls=request.video_urls,
+            prefetched_videos=request.prefetched_videos,
+            search_query=request.search_query,
         )
         
         # 提取响应数据
         answer = result.get("answer", "")
         metadata = result.get("metadata")
+        video_urls = result.get("video_urls")
+        search_query = result.get("search_query")
         
         # 确保answer不为空
         if not answer:
@@ -344,7 +407,9 @@ async def multi_video_endpoint(
         response_data = MultiVideoResponse(
             success=True,
             answer=answer,
-            metadata=metadata
+            metadata=metadata,
+            video_urls=video_urls,
+            search_query=search_query
         )
         # 将 Pydantic 模型转换为字典以便 JSON 序列化
         return R.success(data=response_data.model_dump() if hasattr(response_data, 'model_dump') else response_data.dict())

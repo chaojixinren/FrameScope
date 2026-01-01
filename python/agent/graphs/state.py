@@ -18,7 +18,7 @@ class AIState(TypedDict):
     answer: Optional[str]          # 最近一次助手回复
     
     # 视频搜索相关（多视频功能）
-    video_urls: Optional[List[Dict[str, Any]]]  # [{"url": "...", "platform": "...", "title": "...", "popularity_score": float}]
+    video_urls: Optional[List[Dict[str, Any]]]  # [{"url": "...", "platform": "...", "title": "...", "description": "...", "popularity_score": float}]
     search_query: Optional[str]  # Agent1 生成的搜索查询
     video_ids: Optional[List[str]]  # 视频ID列表（用于example视频处理）
     max_videos: Optional[int]  # 最大视频数量（可选，默认5）

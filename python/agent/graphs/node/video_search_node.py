@@ -36,6 +36,7 @@ def format_user_provided_url(url: str) -> dict:
         "url": url,
         "platform": platform,
         "title": title,
+        "description": "",
         "popularity_score": 1.0,  # 用户提供的URL给予最高优先级得分
     }
 
@@ -57,6 +58,20 @@ def video_search_node(state: AIState) -> AIState:
         AIState: 更新后的状态，包含 video_urls 和 search_query 字段
     """
     question = state.get("question", "")
+
+    prefetched_videos = state.get("video_urls") or []
+    if prefetched_videos:
+        if isinstance(prefetched_videos, list) and isinstance(prefetched_videos[0], str):
+            prefetched_videos = [format_user_provided_url(url) for url in prefetched_videos]
+            state["video_urls"] = prefetched_videos
+        else:
+            for video in prefetched_videos:
+                if isinstance(video, dict) and "description" not in video:
+                    video["description"] = ""
+        if "search_query" not in state:
+            state["search_query"] = None
+        print("[Video Search Node] Prefetched videos detected, skipping search.")
+        return state
     
     if not question:
         print("[Video Search Node] 未提供问题，返回空结果")

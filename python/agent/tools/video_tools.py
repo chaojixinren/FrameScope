@@ -511,6 +511,7 @@ def search_and_filter_videos(
             "url": video["url"],
             "platform": video["platform"],
             "title": video["title"],
+            "description": video.get("description", ""),
             "popularity_score": video["popularity_score"],
         })
     
