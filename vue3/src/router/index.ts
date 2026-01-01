@@ -43,20 +43,26 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
   
-  // 初始化认证状态
-  if (!userStore.isAuthenticated) {
-    userStore.initAuth()
+  // 初始化认证状态（每次路由切换时都检查）
+  userStore.initAuth()
+
+  // 获取路由的认证要求（默认需要认证，除非明确设置为 false）
+  const requiresAuth = to.meta.requiresAuth !== false
+
+  // 如果路由需要认证但用户未登录，重定向到登录页
+  if (requiresAuth && !userStore.isAuthenticated) {
+    next({ name: 'Login', query: { redirect: to.fullPath } })
+    return
   }
 
-  // 检查是否需要认证
-  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if ((to.name === 'Login' || to.name === 'Register') && userStore.isAuthenticated) {
-    // 已登录用户访问登录/注册页，重定向到首页
+  // 如果已登录用户访问登录/注册页，重定向到首页
+  if ((to.name === 'Login' || to.name === 'Register') && userStore.isAuthenticated) {
     next({ name: 'Home' })
-  } else {
-    next()
+    return
   }
+
+  // 允许访问
+  next()
 })
 
 export default router
