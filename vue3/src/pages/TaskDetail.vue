@@ -121,13 +121,28 @@
           </div>
         </div>
 
-        <!-- AI问答区域 -->
+        <!-- AI问答区域（对话形式） -->
         <div class="section qa-section">
           <h2 class="section-title">继续提问</h2>
           <p class="section-description">基于视频内容理解，您可以继续提问，AI将为您提供更深入的分析和解答</p>
           
-          <!-- 问答历史列表 -->
-          <div v-if="questions && questions.length > 0" class="qa-list">
+          <!-- 对话消息列表（优先显示conversation的消息） -->
+          <div v-if="messages.length > 0" class="messages-list">
+            <div
+              v-for="(msg, index) in messages"
+              :key="index"
+              class="message-item"
+              :class="msg.role"
+            >
+              <div class="message-content">
+                <div class="message-text" v-html="formatAnswer(msg.content)"></div>
+                <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 兼容旧的问答历史列表（如果存在且没有conversation消息） -->
+          <div v-else-if="questions && questions.length > 0" class="qa-list">
             <div
               v-for="qa in questions"
               :key="qa.id"
@@ -233,8 +248,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
-import { taskApi } from '@/api/task'
+import { useConversationStore } from '@/stores/conversation'
 import type { Task, QuestionAnswer } from '@/stores/task'
+import type { Message } from '@/api/conversation'
 import { marked } from 'marked'
 
 // 配置marked选项
@@ -245,8 +261,14 @@ marked.setOptions({
 
 const route = useRoute()
 const taskStore = useTaskStore()
+const conversationStore = useConversationStore()
 
 const taskId = computed(() => route.params.id as string)
+const conversationId = computed(() => {
+  const id = route.query.conversationId
+  return id ? parseInt(String(id)) : null
+})
+
 const task = computed(() => {
   const foundTask = taskStore.tasks.find(t => t.id === taskId.value)
   if (foundTask) {
@@ -255,6 +277,8 @@ const task = computed(() => {
   return foundTask || null
 })
 
+// 对话消息列表
+const messages = computed(() => conversationStore.currentMessages)
 const questions = computed(() => task.value?.questions || [])
 const loading = ref(false)
 const questionInput = ref('')
@@ -268,6 +292,7 @@ const statusText: Record<Task['status'], string> = {
 }
 
 const formatDate = (dateString: string) => {
+  if (!dateString) return ''
   const date = new Date(dateString)
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
@@ -325,6 +350,49 @@ const handleEnterKey = (event: KeyboardEvent) => {
   // Enter 发送
   if (canSendQuestion.value) {
     sendQuestion()
+  }
+}
+
+// 生成模拟任务结果
+const generateMockTaskResult = (_question: string) => {
+  // 参数保留用于未来根据问题生成个性化结果
+  return {
+    commonDescriptions: [
+      '产品外观设计简洁现代',
+      '性能表现稳定可靠',
+      '价格定位在中高端市场',
+      '用户体验整体良好'
+    ],
+    contradictions: [
+      {
+        topic: '电池续航',
+        points: [
+          { video: '视频1', view: '续航可达10小时，完全满足日常使用' },
+          { video: '视频2', view: '续航仅为6小时，重度使用需要频繁充电' }
+        ]
+      },
+      {
+        topic: '性价比',
+        points: [
+          { video: '视频1', view: '性价比很高，值得购买' },
+          { video: '视频2', view: '价格偏高，性价比一般' }
+        ]
+      }
+    ],
+    uniqueFeatures: [
+      {
+        video: '视频1',
+        features: ['强调了快充功能', '提到了特殊材质', '重点介绍了拍照功能']
+      },
+      {
+        video: '视频2',
+        features: ['重点关注了性价比', '提到了竞品对比', '详细分析了游戏性能']
+      },
+      {
+        video: '视频3',
+        features: ['强调了系统流畅度', '提到了生态联动', '详细介绍了屏幕显示效果']
+      }
+    ]
   }
 }
 
@@ -414,24 +482,52 @@ const sendQuestion = async () => {
   questionInput.value = ''
 
   try {
-    // 生成样例回答（暂时不连接后端）
-    const answer = generateSampleAnswer(currentInput)
-    
-    // 创建问答记录
-    const newQA: QuestionAnswer = {
-      id: `qa_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      question: currentInput,
-      answer: answer,
-      createdAt: new Date().toISOString()
-    }
+    // 如果有conversationId，使用对话模式
+    if (conversationId.value) {
+      // 添加用户消息
+      const userMessage: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: currentInput,
+        created_at: new Date().toISOString()
+      }
+      conversationStore.addMessage(userMessage)
 
-    // 更新任务，添加新的问答
-    const currentQuestions = task.value.questions || []
-    const updatedQuestions = [...currentQuestions, newQA]
-    
-    taskStore.updateTask(task.value.id, {
-      questions: updatedQuestions
-    })
+      // 模拟延迟
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // 生成样例回答（暂时不连接后端，基于任务结果）
+      const answer = generateSampleAnswer(currentInput)
+      
+      // 添加助手回复
+      const assistantMessage: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: answer,
+        created_at: new Date().toISOString()
+      }
+      conversationStore.addMessage(assistantMessage)
+
+      // 刷新对话列表
+      await conversationStore.refreshConversations()
+    } else {
+      // 没有conversationId，使用任务模式（原有逻辑）
+      const answer = generateSampleAnswer(currentInput)
+      
+      const newQA: QuestionAnswer = {
+        id: `qa_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        question: currentInput,
+        answer: answer,
+        createdAt: new Date().toISOString()
+      }
+
+      const currentQuestions = task.value.questions || []
+      const updatedQuestions = [...currentQuestions, newQA]
+      
+      taskStore.updateTask(task.value.id, {
+        questions: updatedQuestions
+      })
+    }
   } catch (error) {
     console.error('发送问题失败:', error)
     // 恢复输入
@@ -442,27 +538,61 @@ const sendQuestion = async () => {
 }
 
 onMounted(async () => {
-  // 如果任务不存在，尝试从 API 加载
+  // 如果有conversationId，加载对话详情
+  if (conversationId.value) {
+    try {
+      await conversationStore.loadConversation(conversationId.value)
+    } catch (error) {
+      console.error('加载对话失败:', error)
+    }
+  }
+
+  // 如果任务不存在，创建模拟任务
   if (!task.value) {
     loading.value = true
     try {
-      const loadedTask = await taskApi.getTask(taskId.value)
-      taskStore.addTask(loadedTask)
-      taskStore.setCurrentTask(loadedTask)
+      // 从路由参数获取问题，如果没有则使用默认值
+      const question = (route.query.question as string) || '产品分析'
+      
+      // 创建模拟任务
+      const mockTask: Task = {
+        id: taskId.value,
+        title: question,
+        videoUrls: [
+          'https://www.bilibili.com/video/BV1example1',
+          'https://www.bilibili.com/video/BV1example2',
+          'https://www.bilibili.com/video/BV1example3'
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'completed',
+        result: generateMockTaskResult(question)
+      }
+      
+      taskStore.addTask(mockTask)
+      taskStore.setCurrentTask(mockTask)
+      taskStore.saveTasks()
     } catch (error) {
-      console.error('Failed to load task:', error)
+      console.error('Failed to create mock task:', error)
     } finally {
       loading.value = false
     }
   } else {
     taskStore.setCurrentTask(task.value)
     
-    // 如果任务状态是 pending，自动开始分析
+    // 如果任务状态是 pending，自动开始分析（模拟）
     if (task.value.status === 'pending') {
       loading.value = true
       try {
-        const updatedTask = await taskApi.analyzeTask(task.value.id)
-        taskStore.updateTask(task.value.id, updatedTask)
+        // 模拟分析延迟
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // 更新任务为已完成，并添加模拟结果
+        const question = task.value.title || '产品分析'
+        taskStore.updateTask(task.value.id, {
+          status: 'completed',
+          result: generateMockTaskResult(question)
+        })
       } catch (error) {
         console.error('Failed to analyze task:', error)
         taskStore.updateTask(task.value.id, { status: 'error' })
@@ -818,6 +948,64 @@ onMounted(async () => {
   line-height: 1.6;
 }
 
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.messages-list .message-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.messages-list .message-item.user {
+  align-items: flex-end;
+}
+
+.messages-list .message-item.assistant {
+  align-items: flex-start;
+}
+
+.messages-list .message-content {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
+}
+
+.messages-list .message-item.user .message-content {
+  background-color: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+.messages-list .message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.messages-list .message-item.user .message-text {
+  color: white;
+}
+
+.messages-list .message-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.messages-list .message-item.user .message-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .qa-list {
   display: flex;
   flex-direction: column;
@@ -1022,6 +1210,119 @@ onMounted(async () => {
 .qa-answer .qa-text {
   background-color: var(--bg-primary);
   border-color: var(--border-light);
+}
+
+/* 对话模式样式 */
+.conversation-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 80px);
+  max-height: 900px;
+}
+
+.conversation-header {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 24px;
+}
+
+.conversation-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.conversation-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conversation-date {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.message-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-item.user {
+  align-items: flex-end;
+}
+
+.message-item.assistant {
+  align-items: flex-start;
+}
+
+.message-content {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
+}
+
+.message-item.user .message-content {
+  background-color: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+.message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.message-item.user .message-text {
+  color: white;
+}
+
+.message-text :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.message-text :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-text :deep(ul), .message-text :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-text :deep(li) {
+  margin: 4px 0;
+}
+
+.message-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.message-item.user .message-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.empty-messages {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
 }
 
 .qa-time {

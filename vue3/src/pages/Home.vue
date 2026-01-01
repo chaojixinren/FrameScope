@@ -4,25 +4,26 @@
       <div class="welcome-section">
         <h1 class="welcome-title">FrameScope——帧析云鉴系统</h1>
         <p class="welcome-subtitle">
-          创建分析任务，系统将自动获取多个相关视频并进行分析，提取共同描述、矛盾点和独特特征
+          输入您的问题，系统将自动搜索相关视频并进行分析，为您提供多角度的总结和答案
         </p>
       </div>
 
+      <!-- 创建新任务区域 -->
       <div class="task-form-section">
         <div class="form-card">
           <h2 class="form-title">创建新任务</h2>
 
           <div class="form-group">
-            <label for="task-title">任务名称</label>
-            <input
-              id="task-title"
-              v-model="form.title"
-              type="text"
-              class="input"
-              placeholder="例如：iPhone 15 评测对比分析"
-            />
+            <label for="question-input">您的问题</label>
+            <textarea
+              id="question-input"
+              v-model="form.question"
+              class="textarea"
+              placeholder="例如：iPhone 15 和 iPhone 14 有什么区别？哪个更值得买？"
+              rows="4"
+            ></textarea>
             <div class="form-hint">
-              任务名称用于标识和管理分析任务
+              输入您想了解的问题，系统将自动搜索相关视频并进行分析
             </div>
           </div>
 
@@ -33,7 +34,7 @@
           <button
             class="btn btn-primary submit-btn"
             :disabled="loading || !canSubmit"
-            @click="handleSubmit"
+            @click="handleCreateTask"
           >
             {{ loading ? '创建中...' : '创建任务' }}
           </button>
@@ -46,45 +47,112 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useConversationStore } from '@/stores/conversation'
 import { useTaskStore } from '@/stores/task'
-import { taskApi } from '@/api/task'
+import type { Task } from '@/stores/task'
 
 const router = useRouter()
+const conversationStore = useConversationStore()
 const taskStore = useTaskStore()
 
 const form = ref({
-  title: ''
+  question: ''
 })
 
 const loading = ref(false)
 const error = ref('')
 
 const canSubmit = computed(() => {
-  return !loading.value && form.value.title.trim().length > 0
+  return !loading.value && form.value.question.trim().length > 0
 })
 
-const handleSubmit = async () => {
+// 生成模拟任务结果
+const generateMockTaskResult = (_question: string) => {
+  // 参数保留用于未来根据问题生成个性化结果
+  return {
+    commonDescriptions: [
+      '产品外观设计简洁现代',
+      '性能表现稳定可靠',
+      '价格定位在中高端市场',
+      '用户体验整体良好'
+    ],
+    contradictions: [
+      {
+        topic: '电池续航',
+        points: [
+          { video: '视频1', view: '续航可达10小时，完全满足日常使用' },
+          { video: '视频2', view: '续航仅为6小时，重度使用需要频繁充电' }
+        ]
+      },
+      {
+        topic: '性价比',
+        points: [
+          { video: '视频1', view: '性价比很高，值得购买' },
+          { video: '视频2', view: '价格偏高，性价比一般' }
+        ]
+      }
+    ],
+    uniqueFeatures: [
+      {
+        video: '视频1',
+        features: ['强调了快充功能', '提到了特殊材质', '重点介绍了拍照功能']
+      },
+      {
+        video: '视频2',
+        features: ['重点关注了性价比', '提到了竞品对比', '详细分析了游戏性能']
+      },
+      {
+        video: '视频3',
+        features: ['强调了系统流畅度', '提到了生态联动', '详细介绍了屏幕显示效果']
+      }
+    ]
+  }
+}
+
+const handleCreateTask = async () => {
   if (!canSubmit.value) return
 
   loading.value = true
   error.value = ''
 
   try {
-    const task = await taskApi.createTask({
-      title: form.value.title.trim() || `任务 ${new Date().toLocaleString()}`
-    })
-
-    taskStore.addTask(task)
-    taskStore.saveTasks()
-
-    // 跳转到任务详情页并开始分析
-    router.push({ name: 'Task', params: { id: task.id } })
+    const questionText = form.value.question.trim()
     
-    // 开始分析（后端会自动获取视频并分析）
-    const analyzedTask = await taskApi.analyzeTask(task.id)
-    taskStore.updateTask(task.id, analyzedTask)
+    // 创建新对话
+    const conversation = await conversationStore.createConversation()
+    
+    // 生成模拟任务
+    const taskId = `task_${Date.now()}`
+    const mockTask: Task = {
+      id: taskId,
+      title: questionText,
+      videoUrls: [
+        'https://www.bilibili.com/video/BV1example1',
+        'https://www.bilibili.com/video/BV1example2',
+        'https://www.bilibili.com/video/BV1example3'
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'completed',
+      result: generateMockTaskResult(questionText)
+    }
+    
+    // 添加到任务列表
+    taskStore.addTask(mockTask)
+    taskStore.saveTasks()
+    
+    // 跳转到任务详情页，传递 conversationId 和初始问题
+    router.push({
+      name: 'Task',
+      params: { id: taskId },
+      query: { 
+        conversationId: conversation.id,
+        question: questionText
+      }
+    })
   } catch (err: any) {
     error.value = err.message || '创建任务失败，请稍后重试'
+    console.error('创建任务失败:', err)
   } finally {
     loading.value = false
   }
@@ -175,6 +243,98 @@ const handleSubmit = async () => {
   width: 100%;
   padding: 12px;
   font-size: 16px;
+}
+
+.messages-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.message-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-item.user {
+  align-items: flex-end;
+}
+
+.message-item.assistant {
+  align-items: flex-start;
+}
+
+.message-content {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
+}
+
+.message-item.user .message-content {
+  background-color: var(--accent-blue);
+  color: white;
+  border-color: var(--accent-blue);
+}
+
+.message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.message-item.user .message-text {
+  color: white;
+}
+
+.message-text :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.message-text :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-text :deep(ul), .message-text :deep(ol) {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-text :deep(li) {
+  margin: 4px 0;
+}
+
+.message-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.message-item.user .message-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 100px;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue);
 }
 </style>
 

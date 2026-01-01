@@ -1,4 +1,4 @@
-import api from './index'
+import api from '@/axios'
 import type { Task } from '@/stores/task'
 
 export interface CreateTaskRequest {
