@@ -50,6 +50,7 @@ import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useTaskStore } from '@/stores/task'
 import type { Task } from '@/stores/task'
+import { multiVideoApi } from '@/api/multi_video'
 
 const router = useRouter()
 const conversationStore = useConversationStore()
@@ -121,24 +122,36 @@ const handleCreateTask = async () => {
     // 创建新对话
     const conversation = await conversationStore.createConversation()
     
-    // 生成模拟任务
+    // 使用example目录下的默认视频ID列表
+    const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
+    
+    // 调用后端API：使用example_video接口进行分析
+    const response = await multiVideoApi.queryExample({
+      question: questionText,
+      video_ids: defaultVideoIds,
+      conversation_id: conversation.id
+    })
+    
+    // 生成任务对象
     const taskId = `task_${Date.now()}`
-    const mockTask: Task = {
+    const task: Task = {
       id: taskId,
       title: questionText,
-      videoUrls: [
-        'https://www.bilibili.com/video/BV1example1',
-        'https://www.bilibili.com/video/BV1example2',
-        'https://www.bilibili.com/video/BV1example3'
-      ],
+      videoUrls: defaultVideoIds.map(id => `https://www.bilibili.com/video/${id}`),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'completed',
-      result: generateMockTaskResult(questionText)
+      result: generateMockTaskResult(questionText),
+      questions: [{
+        id: `qa_${Date.now()}`,
+        question: questionText,
+        answer: response.answer,
+        createdAt: new Date().toISOString()
+      }]
     }
     
     // 添加到任务列表
-    taskStore.addTask(mockTask)
+    taskStore.addTask(task)
     taskStore.saveTasks()
     
     // 跳转到任务详情页，传递 conversationId 和初始问题

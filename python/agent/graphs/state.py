@@ -20,6 +20,7 @@ class AIState(TypedDict):
     # 视频搜索相关（多视频功能）
     video_urls: Optional[List[Dict[str, Any]]]  # [{"url": "...", "platform": "...", "title": "...", "popularity_score": float}]
     search_query: Optional[str]  # Agent1 生成的搜索查询
+    video_ids: Optional[List[str]]  # 视频ID列表（用于example视频处理）
     
     # 笔记生成相关（多视频功能）
     note_results: Optional[List[Dict[str, Any]]]  # 每个视频的笔记结果

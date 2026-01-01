@@ -8,6 +8,15 @@ export interface MultiVideoRequest {
   provider_id?: string
 }
 
+export interface ExampleVideoRequest {
+  question: string
+  video_ids: string[]
+  session_id?: string
+  conversation_id?: number
+  model_name?: string
+  provider_id?: string
+}
+
 export interface MultiVideoResponse {
   success: boolean
   answer: string
@@ -22,6 +31,12 @@ export const multiVideoApi = {
   // 发送多视频查询请求
   query: async (data: MultiVideoRequest): Promise<MultiVideoResponse> => {
     const response = await api.post<MultiVideoResponse>('/multi_video', data)
+    return response.data
+  },
+
+  // 发送示例视频查询请求（使用example目录下的视频）
+  queryExample: async (data: ExampleVideoRequest): Promise<MultiVideoResponse> => {
+    const response = await api.post<MultiVideoResponse>('/example_video', data)
     return response.data
   }
 }

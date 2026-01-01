@@ -252,6 +252,7 @@ import { useConversationStore } from '@/stores/conversation'
 import type { Task, QuestionAnswer } from '@/stores/task'
 import type { Message } from '@/api/conversation'
 import { marked } from 'marked'
+import { multiVideoApi } from '@/api/multi_video'
 
 // 配置marked选项
 marked.setOptions({
@@ -471,6 +472,26 @@ const generateSampleAnswer = (question: string): string => {
   }
 }
 
+// 从视频URL中提取视频ID（B站BV号）
+const extractVideoIds = (videoUrls: string[]): string[] => {
+  const videoIds: string[] = []
+  const bvPattern = /BV[0-9A-Za-z]+/g
+  
+  videoUrls.forEach(url => {
+    const matches = url.match(bvPattern)
+    if (matches) {
+      videoIds.push(...matches)
+    }
+  })
+  
+  // 如果没有从URL中提取到，使用example目录中的默认视频ID列表
+  if (videoIds.length === 0) {
+    return ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
+  }
+  
+  return [...new Set(videoIds)] // 去重
+}
+
 const sendQuestion = async () => {
   if (!canSendQuestion.value || !task.value) return
 
@@ -493,17 +514,21 @@ const sendQuestion = async () => {
       }
       conversationStore.addMessage(userMessage)
 
-      // 模拟延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // 生成样例回答（暂时不连接后端，基于任务结果）
-      const answer = generateSampleAnswer(currentInput)
+      // 调用后端API：使用example_video接口
+      // 从任务中提取视频ID，如果没有则使用默认列表
+      const videoIds = extractVideoIds(task.value.videoUrls || [])
+      
+      const response = await multiVideoApi.queryExample({
+        question: currentInput,
+        video_ids: videoIds,
+        conversation_id: conversationId.value
+      })
       
       // 添加助手回复
       const assistantMessage: Message = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: answer,
+        content: response.answer,
         created_at: new Date().toISOString()
       }
       conversationStore.addMessage(assistantMessage)
@@ -511,13 +536,20 @@ const sendQuestion = async () => {
       // 刷新对话列表
       await conversationStore.refreshConversations()
     } else {
-      // 没有conversationId，使用任务模式（原有逻辑）
-      const answer = generateSampleAnswer(currentInput)
+      // 没有conversationId，使用任务模式
+      // 从任务中提取视频ID，如果没有则使用默认列表
+      const videoIds = extractVideoIds(task.value.videoUrls || [])
+      
+      // 调用后端API：使用example_video接口
+      const response = await multiVideoApi.queryExample({
+        question: currentInput,
+        video_ids: videoIds
+      })
       
       const newQA: QuestionAnswer = {
         id: `qa_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         question: currentInput,
-        answer: answer,
+        answer: response.answer,
         createdAt: new Date().toISOString()
       }
 
@@ -532,6 +564,9 @@ const sendQuestion = async () => {
     console.error('发送问题失败:', error)
     // 恢复输入
     questionInput.value = currentInput
+    
+    // 显示错误消息（可以添加到UI中）
+    alert('发送问题失败，请稍后重试: ' + (error instanceof Error ? error.message : String(error)))
   } finally {
     sendingQuestion.value = false
   }
