@@ -2,13 +2,13 @@
   <div class="task-detail-page">
     <section class="page-shell">
       <div class="page-shell__main">
-        <div class="page-kicker">????</div>
-        <h1 class="page-title">{{ conversationStore.currentConversation?.title || '???' }}</h1>
+        <div class="page-kicker">任务</div>
+        <h1 class="page-title">{{ conversationStore.currentConversation?.title || '未命名任务' }}</h1>
         <p class="page-subtitle">
           {{
             conversationStore.currentConversation
               ? formatDate(conversationStore.currentConversation.created_at)
-              : '???????????'
+              : '暂无创建时间'
           }}
         </p>
       </div>
@@ -22,46 +22,18 @@
           @click="handleDeleteConversation"
         >
           <span v-if="deletingConversation" class="btn__spinner" aria-hidden="true"></span>
-          ????
+          删除
         </button>
       </div>
     </section>
 
-    <div class="panel toolbar">
-      <div class="panel__bd toolbar__content">
-        <div class="toolbar-group">
-          <label for="message-search">????</label>
-          <input
-            id="message-search"
-            v-model="searchQuery"
-            class="input"
-            placeholder="????????????"
-          />
-        </div>
-        <div class="toolbar-meta">
-          <div class="meta-item">
-            <span class="meta-label">??</span>
-            <span
-              class="tag status-tag"
-              :data-state="sendingQuestion ? 'processing' : firstAnswer ? 'completed' : 'idle'"
-            >
-              {{ sendingQuestion ? '???' : firstAnswer ? '???' : '???' }}
-            </span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">???</span>
-            <span class="badge">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
-          </div>
-        </div>
-        <button type="button" class="btn btn--primary" @click="focusComposer">????</button>
-      </div>
-    </div>
+    
 
     <div v-if="errorMessage" class="panel error-panel">
       <div class="panel__bd error-state">
-        <div class="error-icon" aria-hidden="true">?</div>
+        <div class="error-icon" aria-hidden="true">⚠</div>
         <div>
-          <div class="error-title">????</div>
+          <div class="error-title">出错了</div>
           <div class="error-desc">{{ errorMessage }}</div>
         </div>
       </div>
@@ -75,49 +47,14 @@
       </div>
     </div>
 
-    <div v-else class="content-grid">
-      <aside class="content-left">
+    <div v-else class="content-single">
+      <section class="content-main">
+        <!-- 视频链接卡片 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????????????</p>
-            </div>
-            <span class="badge">Console</span>
-          </div>
-          <div class="panel__bd meta-list">
-            <div class="meta-row">
-              <span class="meta-label">????</span>
-              <span class="meta-value">
-                {{
-                  conversationStore.currentConversation
-                    ? formatDate(conversationStore.currentConversation.created_at)
-                    : '?'
-                }}
-              </span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">????</span>
-              <span class="meta-value">
-                {{ sendingQuestion ? '???' : firstAnswer ? '???' : '????' }}
-              </span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">????</span>
-              <span class="meta-value">{{ currentVideoIds.length || selectedVideoCount }} ?</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">?? ID</span>
-              <span class="meta-value">#{{ conversationId || '?' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel__hd">
-            <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????????????</p>
+              <h2 class="panel-title">相关视频</h2>
+              <p class="panel-subtitle">本次分析涉及的视频</p>
             </div>
           </div>
           <div class="panel__bd">
@@ -135,19 +72,18 @@
               </a>
             </div>
             <div v-else class="empty-inline">
-              <div class="empty-icon" aria-hidden="true">?</div>
-              <div>????????</div>
+              <div class="empty-icon" aria-hidden="true">📹</div>
+              <div>暂无视频</div>
             </div>
           </div>
         </div>
-      </aside>
 
-      <section class="content-right">
+        <!-- 分析结果卡片 -->
         <div class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">??????????</p>
+              <h2 class="panel-title">分析结果</h2>
+              <p class="panel-subtitle">AI分析的结果展示</p>
             </div>
             <span class="tag">Analysis</span>
           </div>
@@ -158,7 +94,7 @@
                   <div class="loading-spinner-small"></div>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">????????...</div>
+                  <div class="step-title">正在分析中...</div>
                 </div>
               </div>
             </div>
@@ -171,7 +107,7 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????</div>
+                  <div class="step-title">问题已提交</div>
                 </div>
               </div>
 
@@ -182,10 +118,10 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????</div>
+                  <div class="step-title">视频已选择</div>
                   <div class="video-list-inline">
                     <span v-for="(videoId, index) in currentVideoIds" :key="videoId" class="video-chip">
-                      ?? {{ index + 1 }} ? {{ videoId }}
+                      视频 {{ index + 1 }}：{{ videoId }}
                     </span>
                   </div>
                 </div>
@@ -198,7 +134,7 @@
                   </svg>
                 </div>
                 <div class="step-content">
-                  <div class="step-title">???????????</div>
+                  <div class="step-title">分析结果已生成</div>
                 </div>
               </div>
 
@@ -207,19 +143,20 @@
             </div>
 
             <div v-else class="empty-state">
-              <div class="empty-icon" aria-hidden="true">?</div>
-              <div class="empty-title">??????</div>
-              <div class="empty-desc">??????????????????</div>
-              <button type="button" class="btn btn--ghost" @click="focusComposer">????</button>
+              <div class="empty-icon" aria-hidden="true">💭</div>
+              <div class="empty-title">暂无结果</div>
+              <div class="empty-desc">输入问题开始分析视频内容</div>
+              <button type="button" class="btn btn--ghost" @click="focusComposer">开始提问</button>
             </div>
           </div>
         </div>
 
+        <!-- 后续评论 -->
         <div v-if="hasFollowupConversation" class="panel">
           <div class="panel__hd">
             <div>
-              <h2 class="panel-title">????</h2>
-              <p class="panel-subtitle">????? AI ???</p>
+              <h2 class="panel-title">后续对话</h2>
+              <p class="panel-subtitle">与 AI 继续交流</p>
             </div>
           </div>
           <div class="panel__bd">
@@ -239,7 +176,7 @@
               <div v-if="sendingQuestion && messages.length > 0" class="message-item assistant">
                 <div class="message-content">
                   <div class="message-text">
-                    <div class="typing-indicator" aria-label="??????">
+                    <div class="typing-indicator" aria-label="正在输入">
                       <span></span>
                       <span></span>
                       <span></span>
@@ -255,15 +192,15 @@
           <div class="panel__hd">
             <div>
               <h2 class="panel-title">
-                {{ conversationId && (firstAnswer || hasFollowupConversation) ? '????' : '????' }}
+                {{ conversationId && (firstAnswer || hasFollowupConversation) ? '继续提问' : '提问' }}
               </h2>
-              <p class="panel-subtitle">??????????????????</p>
+              <p class="panel-subtitle">输入您的问题，AI将为您分析</p>
             </div>
           </div>
           <div class="panel__bd">
             <div class="qa-input-area">
               <div v-if="!conversationId || messages.length === 0" class="video-count-selector">
-                <label for="video-count-input" class="video-count-label">??????</label>
+                <label for="video-count-input" class="video-count-label">视频数量</label>
                 <input
                   id="video-count-input"
                   v-model.number="selectedVideoCount"
@@ -271,22 +208,22 @@
                   class="input video-count-input"
                   min="1"
                   max="20"
-                  placeholder="????????1-20?"
+                  placeholder="请输入1-20之间的数字"
                   aria-describedby="video-count-hint"
                 />
                 <span id="video-count-hint" class="video-count-hint">
-                  ???????????????????? 3-10 ??
+                  建议选择3-10个视频以获得最佳效果
                 </span>
               </div>
 
               <div class="qa-input-container">
-                <label class="sr-only" for="question-textarea">????</label>
+                <label class="sr-only" for="question-textarea">问题</label>
                 <textarea
                   id="question-textarea"
                   ref="composerRef"
                   v-model="questionInput"
                   class="textarea qa-textarea"
-                  placeholder="?????????????A7M4??????"
+                  placeholder="例如：请分析A7M4相机的优缺点"
                   rows="3"
                   @keydown.enter.prevent="handleEnterKey"
                   aria-describedby="qa-hint"
@@ -317,7 +254,7 @@
                   <span v-else class="btn__spinner" aria-hidden="true"></span>
                 </button>
               </div>
-              <div id="qa-hint" class="qa-hint">? Enter ???Shift + Enter ??</div>
+              <div id="qa-hint" class="qa-hint">按 Enter 发送，Shift + Enter 换行</div>
             </div>
           </div>
         </div>
@@ -386,7 +323,6 @@ const currentVideoIds = ref<string[]>([])
 const selectedVideoCount = ref<number>(5)
 
 const errorMessage = ref('')
-const searchQuery = ref('')
 const composerRef = ref<HTMLTextAreaElement | null>(null)
 
 // 自动滚动到底部（使用主页面滚动条）
@@ -853,6 +789,27 @@ onMounted(async () => {
   max-width: 720px;
 }
 
+.page-shell__actions .btn--danger {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* 浅色模式下使用更深的红色以确保对比度 */
+@media (prefers-color-scheme: light) {
+  .page-shell__actions .btn--danger {
+    color: #991b1b;
+  }
+  
+  .page-shell__actions .btn--danger:hover {
+    color: #7f1d1d;
+  }
+  
+  .page-shell__actions .btn--danger:disabled {
+    color: #991b1b;
+    opacity: 0.6;
+  }
+}
+
 .page-kicker {
   font-size: 12px;
   letter-spacing: 0.6px;
@@ -876,10 +833,10 @@ onMounted(async () => {
 }
 
 .toolbar__content {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
+  display: flex;
   gap: var(--space-3);
-  align-items: end;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .toolbar-group {
@@ -961,17 +918,24 @@ onMounted(async () => {
   height: 96px;
 }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
-  gap: var(--space-4);
-}
-
-.content-left,
-.content-right {
+.content-single {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.content-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 100%;
+}
+
+.content-main .panel,
+.error-panel,
+.loading-panel {
+  margin-left: var(--space-4);
+  margin-right: var(--space-4);
 }
 
 .panel-title {
@@ -1380,12 +1344,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 1024px) {
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
-
   .toolbar__content {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 

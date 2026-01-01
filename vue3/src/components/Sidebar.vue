@@ -49,6 +49,13 @@
 
     <div v-if="!isCollapsed" class="sidebar-content">
       <div class="sidebar-section">
+        <button
+          type="button"
+          class="btn btn--primary create-task-btn"
+          @click="goToHome"
+        >
+          创建任务
+        </button>
         <div class="sidebar-section__title">
           <span>最近对话</span>
           <span class="badge">{{ conversations.length }}</span>
@@ -118,6 +125,10 @@ const selectConversation = (conversation: Conversation) => {
     params: { id: `conversation_${conversation.id}` },
     query: { conversationId: conversation.id }
   })
+}
+
+const goToHome = () => {
+  router.push({ name: 'Home' })
 }
 
 const formatDate = (dateString: string) => {
@@ -202,6 +213,12 @@ onMounted(async () => {
   gap: var(--space-3);
 }
 
+.create-task-btn {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
 .sidebar-section__title {
   display: flex;
   align-items: center;
@@ -247,6 +264,7 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+  min-width: 0;
 }
 
 .task-title {
@@ -255,6 +273,13 @@ onMounted(async () => {
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-item__top .tag {
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
