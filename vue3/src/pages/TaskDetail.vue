@@ -54,76 +54,78 @@
 
     <div v-else class="content-grid">
       <aside class="content-left">
-        <!-- 对话概览 -->
-        <div class="panel">
-          <div class="panel__hd">
-            <div>
-              <h2 class="panel-title">对话概览</h2>
-              <p class="panel-subtitle">当前任务的关键信息概览。</p>
+        <div class="sticky-sidebar">
+          <!-- 对话概览 -->
+          <div class="panel">
+            <div class="panel__hd">
+              <div>
+                <h2 class="panel-title">对话概览</h2>
+                <p class="panel-subtitle">当前任务的关键信息概览。</p>
+              </div>
+              <span class="badge">Console</span>
             </div>
-            <span class="badge">Console</span>
+            <div class="panel__bd meta-list">
+              <div class="meta-row">
+                <span class="meta-label">创建时间</span>
+                <span class="meta-value">
+                  {{
+                    conversationStore.currentConversation
+                      ? formatDate(conversationStore.currentConversation.created_at)
+                      : '?'
+                  }}
+                </span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">当前状态</span>
+                <span class="meta-value">
+                  {{ sendingQuestion ? '分析中' : firstAnswer ? '已完成' : '待提问' }}
+                </span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">视频数量</span>
+                <span class="meta-value">{{ currentVideos.length || selectedVideoCount }} 个</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">对话 ID</span>
+                <span class="meta-value">#{{ conversationId || '?' }}</span>
+              </div>
+            </div>
           </div>
-          <div class="panel__bd meta-list">
-            <div class="meta-row">
-              <span class="meta-label">创建时间</span>
-              <span class="meta-value">
-                {{
-                  conversationStore.currentConversation
-                    ? formatDate(conversationStore.currentConversation.created_at)
-                    : '?'
-                }}
-              </span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">当前状态</span>
-              <span class="meta-value">
-                {{ sendingQuestion ? '分析中' : firstAnswer ? '已完成' : '待提问' }}
-              </span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">视频数量</span>
-              <span class="meta-value">{{ currentVideos.length || selectedVideoCount }} 个</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">对话 ID</span>
-              <span class="meta-value">#{{ conversationId || '?' }}</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- 视频列表 -->
-        <div class="panel">
-          <div class="panel__hd">
-            <div>
-              <h2 class="panel-title">视频列表</h2>
-              <p class="panel-subtitle">本次分析使用的视频集合。</p>
+          <!-- 视频列表 -->
+          <div class="panel">
+            <div class="panel__hd">
+              <div>
+                <h2 class="panel-title">视频列表</h2>
+                <p class="panel-subtitle">本次分析使用的视频集合。</p>
+              </div>
             </div>
-          </div>
-          <div class="panel__bd">
-            <div v-if="searchingVideos" class="empty-inline">
-              <div class="loading-orbit" aria-hidden="true"></div>
-              <div>正在获取视频列表...</div>
-            </div>
-            <div v-else-if="currentVideos.length > 0" class="video-list">
-              <a
-                v-for="(video, index) in currentVideos"
-                :key="video.url || `video-${index}`"
-                class="video-item"
-                :href="video.url"
-                target="_blank"
-                rel="noopener"
-              >
-                <span class="video-index">{{ index + 1 }}</span>
-                <div class="video-main">
-                  <div class="video-title">{{ video.title || video.url }}</div>
-                  <div class="video-desc">{{ video.description || '暂无简介' }}</div>
-                  <div class="video-link">{{ video.url }}</div>
-                </div>
-              </a>
-            </div>
-            <div v-else class="empty-inline">
-              <div class="empty-icon" aria-hidden="true">?</div>
-              <div>尚未获取视频列表</div>
+            <div class="panel__bd">
+              <div v-if="searchingVideos" class="empty-inline">
+                <div class="loading-orbit" aria-hidden="true"></div>
+                <div>正在获取视频列表...</div>
+              </div>
+              <div v-else-if="currentVideos.length > 0" class="video-list">
+                <a
+                  v-for="(video, index) in currentVideos"
+                  :key="video.url || `video-${index}`"
+                  class="video-item"
+                  :href="video.url"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <span class="video-index">{{ index + 1 }}</span>
+                  <div class="video-main">
+                    <div class="video-title">{{ video.title || video.url }}</div>
+                    <div class="video-desc">{{ video.description || '暂无简介' }}</div>
+                    <div class="video-link">{{ video.url }}</div>
+                  </div>
+                </a>
+              </div>
+              <div v-else class="empty-inline">
+                <div class="empty-icon" aria-hidden="true">?</div>
+                <div>尚未获取视频列表</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1014,7 +1016,7 @@ onMounted(async () => {
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.6fr);
   gap: var(--space-4);
   padding: 0 var(--space-4);
 }
@@ -1024,6 +1026,18 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.sticky-sidebar {
+  position: sticky;
+  top: var(--space-4);
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-height: calc(100vh - var(--space-4) * 2);
+  overflow-y: auto;
 }
 
 .error-panel,

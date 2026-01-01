@@ -116,64 +116,6 @@ def get_video_path_from_id(video_id: str, platform: str) -> Optional[str]:
     return None
 
 
-def is_in_table_cell(markdown: str, marker_pos: int) -> bool:
-    """
-    检测时间戳标记是否在表格单元格中
-    
-    Args:
-        markdown: Markdown文本
-        marker_pos: 标记在文本中的位置
-        
-    Returns:
-        如果标记在表格单元格中返回True，否则返回False
-    """
-    # 查找标记所在的行
-    # 向前查找最近的换行符
-    line_start = markdown.rfind('\n', 0, marker_pos)
-    if line_start == -1:
-        line_start = 0
-    else:
-        line_start += 1  # 跳过换行符本身
-    
-    # 向后查找最近的换行符
-    line_end = markdown.find('\n', marker_pos)
-    if line_end == -1:
-        line_end = len(markdown)
-    
-    # 获取标记所在的行
-    line = markdown[line_start:line_end]
-    
-    # 检查是否是表格行（包含 | 字符，且至少有两个 |）
-    pipe_count = line.count('|')
-    if pipe_count < 2:
-        return False
-    
-    # 检查是否是表头分隔行（如 |---|---|）
-    # 匹配包含多个连字符或冒号的表格分隔行
-    if re.match(r'^\s*\|[\s\-:]+\|', line.strip()):
-        return False
-    
-    # 检查标记是否在两个 | 之间（表格单元格中）
-    # 查找标记在行中的相对位置
-    marker_in_line = marker_pos - line_start
-    
-    # 查找标记前的最后一个 |
-    last_pipe_before = line.rfind('|', 0, marker_in_line)
-    # 查找标记后的第一个 |
-    first_pipe_after = line.find('|', marker_in_line)
-    
-    # 如果标记前后都有 |，说明在表格单元格中
-    # 还需要确保不是在行的开头或结尾（可能是表格的开始或结束）
-    if last_pipe_before != -1 and first_pipe_after != -1:
-        # 确保标记不在第一个 | 之前或最后一个 | 之后
-        first_pipe_in_line = line.find('|')
-        last_pipe_in_line = line.rfind('|')
-        if marker_in_line > first_pipe_in_line and marker_in_line < last_pipe_in_line:
-            return True
-    
-    return False
-
-
 def match_timestamp_to_video(
     timestamp: int,
     video_idx: Optional[int],
@@ -411,48 +353,13 @@ async def trace_node(state: AIState) -> AIState:
                 if not conclusion_text or len(conclusion_text) < 5:
                     conclusion_text = "上述结论"
             
-            # 检测标记是否在表格单元格中
-            marker_pos = updated_markdown.find(marker)
-            in_table = False
-            if marker_pos != -1:
-                in_table = is_in_table_cell(updated_markdown, marker_pos)
-            
-            # 根据是否在表格中，使用不同的替换格式
-            if in_table:
-                # 在表格单元格中：检查标记是否在单元格内容的末尾
-                # 查找标记所在的行
-                line_start = updated_markdown.rfind('\n', 0, marker_pos)
-                if line_start == -1:
-                    line_start = 0
-                else:
-                    line_start += 1
-                line_end = updated_markdown.find('\n', marker_pos)
-                if line_end == -1:
-                    line_end = len(updated_markdown)
-                line = updated_markdown[line_start:line_end]
-                marker_in_line = marker_pos - line_start
-                
-                # 查找标记后的第一个 |
-                next_pipe = line.find('|', marker_in_line)
-                # 查找标记后的下一个非空白字符
-                remaining_text = line[marker_in_line + len(marker):next_pipe if next_pipe != -1 else len(line)].strip()
-                
-                # 如果标记后没有其他内容（或只有空白），说明在单元格末尾，可以安全替换
-                if not remaining_text or remaining_text == '':
-                    # 使用 HTML 格式的链接，避免 Markdown 解析器误解析
-                    replacement = f' <a href="{video_link_url}" target="_blank">查看原片 @ {mm:02d}:{ss:02d}</a>'
-                    print(f"[Trace Node] ⚠ 时间戳标记在表格单元格末尾，使用 HTML 链接格式")
-                else:
-                    # 如果标记在单元格中间，直接移除标记，避免破坏表格结构
-                    replacement = ""
-                    print(f"[Trace Node] ⚠ 时间戳标记在表格单元格中间，已移除以避免破坏表格结构")
-            else:
-                # 不在表格中：使用完整格式（包含图片和换行符）
-                replacement = (
-                    f"{conclusion_text}\n\n"
-                    f"![关键帧 @ {mm:02d}:{ss:02d}]({img_url})\n\n"
-                    f"[查看原片 @ {mm:02d}:{ss:02d}]({video_link_url})"
-                )
+            # 将时间戳标记替换为关键帧图片和链接，自然融入文本
+            # 格式：结论文本 + 关键帧图片 + 原片链接（自然排列）
+            replacement = (
+                f"{conclusion_text}\n\n"
+                f"![关键帧 @ {mm:02d}:{ss:02d}]({img_url})\n\n"
+                f"[查看原片 @ {mm:02d}:{ss:02d}]({video_link_url})"
+            )
             
             # 替换标记（只替换第一次出现的，避免重复替换）
             updated_markdown = updated_markdown.replace(marker, replacement, 1)
