@@ -41,14 +41,11 @@
 
     <div v-if="loading" class="panel loading-panel">
       <div class="panel__bd loading-state" role="status" aria-live="polite">
-        <TechLoader
-          variant="inline"
-          mode="ring"
-          size="lg"
-          text="正在加载..."
-          :active="loading"
-          :showProgress="true"
-        />
+        <div class="loading-orbit" aria-hidden="true"></div>
+        <div class="loading-text">正在加载对话...</div>
+        <div class="skeleton skeleton-line"></div>
+        <div class="skeleton skeleton-block"></div>
+        <div class="skeleton skeleton-block"></div>
       </div>
     </div>
 
@@ -340,7 +337,6 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
-import TechLoader from '@/components/TechLoader.vue'
 import { multiVideoApi, type MultiVideoResponse, type VideoInfo } from '@/api/multi_video'
 import { marked } from 'marked'
 
@@ -986,9 +982,7 @@ onMounted(async () => {
 .loading-state {
   display: grid;
   gap: 12px;
-  justify-items: center;
-  text-align: center;
-  min-height: 220px;
+  justify-items: start;
 }
 
 .loading-orbit {
@@ -1092,6 +1086,8 @@ onMounted(async () => {
 .video-list {
   display: grid;
   gap: 8px;
+  max-height: calc(100vh - 660px);
+  overflow-y: auto;
 }
 
 .video-item {
