@@ -45,7 +45,7 @@
           variant="inline"
           mode="ring"
           size="lg"
-          text="正在加载对话..."
+          text="正在加载..."
           :active="loading"
           :showProgress="true"
         />
