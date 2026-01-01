@@ -335,7 +335,8 @@ async def multi_video_endpoint(
             answer=answer,
             metadata=metadata
         )
-        return R.success(data=response_data.model_dump())
+        # 将 Pydantic 模型转换为字典以便 JSON 序列化
+        return R.success(data=response_data.model_dump() if hasattr(response_data, 'model_dump') else response_data.dict())
         
     except ValueError as e:
         return R.error(code=400, msg=f"输入验证失败: {str(e)}")
@@ -509,7 +510,8 @@ async def example_video_endpoint(
             answer=answer,
             metadata=metadata
         )
-        return R.success(data=response_data.model_dump())
+        # 将 Pydantic 模型转换为字典以便 JSON 序列化
+        return R.success(data=response_data.model_dump() if hasattr(response_data, 'model_dump') else response_data.dict())
         
     except ValueError as e:
         return R.error(code=400, msg=f"输入验证失败: {str(e)}")
