@@ -233,9 +233,31 @@ class NoteGenerator:
         if not provider:
             logger.error(f"[get_gpt] 未找到模型供应商: provider_id={provider_id}")
             raise ProviderError(code=ProviderErrorEnum.NOT_FOUND,message=ProviderErrorEnum.NOT_FOUND.message)
-        logger.info(f"创建 GPT 实例 {provider_id}")
+        
+        # 检查 API Key
+        api_key = provider.get("api_key", "")
+        if not api_key or api_key.strip() == "":
+            provider_name = provider.get("name", provider_id)
+            logger.error(f"[get_gpt] 提供商 {provider_name} (ID: {provider_id}) 的 API Key 为空")
+            raise ProviderError(
+                code=ProviderErrorEnum.WRONG_PARAMETER.code,
+                message=f"提供商 {provider_name} 的 API Key 未配置，请在系统中配置 API Key"
+            )
+        
+        # 检查是否是占位符
+        placeholder_keys = ['your_api_key_here', 'your_deepseek_api_key_here', 
+                           'your_qwen_api_key_here', 'your_openai_api_key_here']
+        if api_key.lower() in placeholder_keys:
+            provider_name = provider.get("name", provider_id)
+            logger.error(f"[get_gpt] 提供商 {provider_name} (ID: {provider_id}) 的 API Key 是占位符: {api_key}")
+            raise ProviderError(
+                code=ProviderErrorEnum.WRONG_PARAMETER.code,
+                message=f"提供商 {provider_name} 的 API Key 是占位符，请替换为真实的 API Key"
+            )
+        
+        logger.info(f"创建 GPT 实例 {provider_id}, 模型: {model_name}, API Key 长度: {len(api_key)}")
         config = ModelConfig(
-            api_key=provider["api_key"],
+            api_key=api_key,
             base_url=provider["base_url"],
             model_name=model_name,
             provider=provider["type"],

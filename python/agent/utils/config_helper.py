@@ -25,12 +25,10 @@ def get_default_model_config() -> Tuple[str, str]:
     从数据库获取默认的模型配置
     
     策略：
-    1. 获取第一个启用的提供商
-    2. 获取数据库中的第一个模型名称
-    3. 返回 (model_name, provider_id)
-    
-    注意：由于 Provider.id (str) 和 Model.provider_id (int) 类型不匹配，
-    此函数返回的配置可能不是精确匹配的。建议在使用时明确指定 model_name 和 provider_id。
+    1. 优先选择 qwen 提供商（如果存在且启用）
+    2. 否则选择第一个启用的提供商
+    3. 根据模型名称匹配对应的提供商（如 qwen-max 匹配 qwen）
+    4. 如果找不到匹配的模型，使用该提供商的第一个模型
     
     Returns:
         Tuple[str, str]: (model_name, provider_id) 元组
@@ -41,11 +39,11 @@ def get_default_model_config() -> Tuple[str, str]:
     try:
         from app.db.engine import get_db
         from sqlalchemy import text
+        from app.db.provider_dao import get_enabled_providers
         
         db = next(get_db())
         try:
-            # 1. 获取第一个启用的提供商
-            from app.db.provider_dao import get_enabled_providers
+            # 1. 获取所有启用的提供商
             enabled_providers = get_enabled_providers()
             
             if not enabled_providers or len(enabled_providers) == 0:
@@ -54,20 +52,43 @@ def get_default_model_config() -> Tuple[str, str]:
                     "或者在请求中明确指定 provider_id 和 model_name。"
                 )
             
-            provider_id = enabled_providers[0].id  # Provider.id 是 str 类型
+            # 2. 优先选择 qwen 提供商
+            provider = None
+            for p in enabled_providers:
+                if p.id.lower() == "qwen":
+                    provider = p
+                    break
             
-            # 2. 获取数据库中的第一个模型名称
-            model_result = db.execute(
-                text("SELECT model_name FROM models ORDER BY id LIMIT 1")
-            ).first()
+            # 如果没有 qwen，选择第一个启用的提供商
+            if not provider:
+                provider = enabled_providers[0]
             
-            if not model_result:
+            provider_id = provider.id  # Provider.id 是 str 类型
+            provider_name_lower = provider.name.lower() if provider.name else ""
+            
+            # 3. 获取所有模型（Model 表没有 enabled 列，所以获取所有模型）
+            all_models = db.execute(
+                text("SELECT id, model_name, provider_id FROM models ORDER BY id")
+            ).fetchall()
+            
+            if not all_models:
                 raise ValueError(
-                    "数据库中没有可用的模型，请先添加至少一个模型。"
+                    "数据库中没有启用的模型，请先添加至少一个模型。"
                     "或者在请求中明确指定 provider_id 和 model_name。"
                 )
             
-            model_name = model_result[0]
+            # 4. 优先选择模型名称包含提供商名称的模型（如 qwen-max 包含 qwen）
+            model_name = None
+            for model_row in all_models:
+                model_name_candidate = model_row[1]
+                # 检查模型名称是否包含提供商名称
+                if provider_name_lower and provider_name_lower in model_name_candidate.lower():
+                    model_name = model_name_candidate
+                    break
+            
+            # 如果没有匹配的，使用第一个模型
+            if not model_name:
+                model_name = all_models[0][1]
             
             return (model_name, provider_id)
             
