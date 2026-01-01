@@ -40,11 +40,13 @@ def video_search_node(state: AIState) -> AIState:
     print(f"[Video Search Node] 扩展后的查询: {expanded_query}")
     
     # 搜索并筛选视频（使用 video_tools 中的工具函数）
+    # 限制视频时长在30分钟以内，优化下载和处理时间
     formatted_videos = search_and_filter_videos(
         query=expanded_query,
         max_results=5,
         page=1,
-        page_size=50
+        page_size=50,
+        max_duration_seconds=1400 
     )
     
     if not formatted_videos:

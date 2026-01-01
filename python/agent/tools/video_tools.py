@@ -385,12 +385,13 @@ def filter_marketing_videos(title: str) -> bool:
     return True
 
 
-def parse_bilibili_search_results(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def parse_bilibili_search_results(data: Dict[str, Any], max_duration_seconds: int = 1800) -> List[Dict[str, Any]]:
     """
     解析 Bilibili 搜索 API 返回的数据
     
     Args:
         data: API 返回的 JSON 数据
+        max_duration_seconds: 最大视频时长（秒），默认1800秒（30分钟）
         
     Returns:
         List[Dict]: 视频信息列表，每个包含 url, title, view, like, score 等
@@ -405,6 +406,31 @@ def parse_bilibili_search_results(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         bvid = item.get("bvid", "")  # BV号
         title = item.get("title", "").replace("<em class=\"keyword\">", "").replace("</em>", "")
         description = item.get("description", "")
+        
+        # 提取视频时长（Bilibili API 可能返回 "MM:SS" 格式或秒数）
+        duration_str = item.get("duration", "")  # 可能是 "10:30" 或 "630" 格式
+        
+        # 将时长转换为秒数
+        duration_seconds = 0
+        if duration_str:
+            try:
+                # 如果是 "MM:SS" 格式
+                if ":" in str(duration_str):
+                    parts = str(duration_str).split(":")
+                    if len(parts) == 2:
+                        duration_seconds = int(parts[0]) * 60 + int(parts[1])
+                    elif len(parts) == 3:  # "HH:MM:SS" 格式
+                        duration_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                else:
+                    # 如果已经是秒数
+                    duration_seconds = int(duration_str)
+            except (ValueError, AttributeError):
+                # 如果解析失败，跳过时长检查（保留该视频）
+                duration_seconds = 0
+        
+        # 过滤超过最大时长的视频（如果时长信息可用）
+        if duration_seconds > 0 and duration_seconds > max_duration_seconds:
+            continue
         
         # 提取统计数据
         view = item.get("play", 0)  # 播放量
@@ -436,6 +462,7 @@ def parse_bilibili_search_results(data: Dict[str, Any]) -> List[Dict[str, Any]]:
             "danmaku": danmaku,
             "favorite": favorite,
             "popularity_score": score,
+            "duration": duration_seconds,  # 添加时长信息
         })
     
     return videos
@@ -445,7 +472,8 @@ def search_and_filter_videos(
     query: str, 
     max_results: int = 5,
     page: int = 1,
-    page_size: int = 50
+    page_size: int = 50,
+    max_duration_seconds: int = 1800  # 最大视频时长（秒），默认30分钟
 ) -> List[Dict[str, Any]]:
     """
     搜索并筛选 Bilibili 视频的完整流程
@@ -455,6 +483,7 @@ def search_and_filter_videos(
         max_results: 最大返回结果数（默认5）
         page: 页码（从1开始）
         page_size: 每页结果数（最大50）
+        max_duration_seconds: 最大视频时长（秒），默认1800秒（30分钟）
         
     Returns:
         List[Dict]: 筛选后的视频列表，按热度得分排序
@@ -465,8 +494,8 @@ def search_and_filter_videos(
     if not search_data:
         return []
     
-    # 解析搜索结果
-    all_videos = parse_bilibili_search_results(search_data)
+    # 解析搜索结果（传入最大时长限制）
+    all_videos = parse_bilibili_search_results(search_data, max_duration_seconds=max_duration_seconds)
     
     if not all_videos:
         return []
