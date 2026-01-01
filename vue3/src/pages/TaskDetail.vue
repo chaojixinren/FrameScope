@@ -204,7 +204,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import type { Message } from '@/api/conversation'
-import { multiVideoApi } from '@/api/multi_video'
+import { multiVideoApi, type MultiVideoResponse } from '@/api/multi_video'
 import { marked } from 'marked'
 
 // 配置marked选项
@@ -508,14 +508,9 @@ const sendQuestion = async () => {
     let response: MultiVideoResponse
     
     if (isFirstAnswer) {
-      // 第一次回答：使用 example_video 接口（使用example目录下的视频）
-      const defaultVideoIds = ['BV1Dk4y1X71E', 'BV1JD4y1z7vc', 'BV1KL411N7KV', 'BV1m94y1E72S']
-      // 保存视频ID列表
-      currentVideoIds.value = defaultVideoIds
-      
-      response = await multiVideoApi.queryExample({
+      // 第一次回答：使用 multi_video 接口（自动搜索相关视频）
+      response = await multiVideoApi.query({
         question: currentInput,
-        video_ids: defaultVideoIds,
         conversation_id: targetConversationId
       })
     } else {
