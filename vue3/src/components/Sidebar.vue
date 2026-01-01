@@ -36,13 +36,14 @@
           />
         </svg>
       </button>
-      <h2 v-if="!isCollapsed" class="sidebar-title">历史任务</h2>
+      <h2 v-if="!isCollapsed" class="sidebar-title">对话历史</h2>
     </div>
 
     <div v-if="!isCollapsed" class="sidebar-content">
       <button
         class="new-task-btn"
-        @click="createNewTask"
+        @click="createNewConversation"
+        :disabled="loading"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
@@ -52,31 +53,31 @@
             stroke-linecap="round"
           />
         </svg>
-        新建任务
+        {{ loading ? '加载中...' : '新建对话' }}
       </button>
 
       <div class="task-list">
         <div
-          v-for="task in tasks"
-          :key="task.id"
+          v-for="conversation in conversations"
+          :key="conversation.id"
           class="task-item"
-          :class="{ active: currentTask?.id === task.id }"
-          @click="selectTask(task)"
+          :class="{ active: currentConversation?.id === conversation.id }"
+          @click="selectConversation(conversation)"
         >
           <div class="task-item-header">
-            <span class="task-title">{{ task.title || '未命名任务' }}</span>
-            <span class="task-status" :class="task.status">
-              {{ statusText[task.status] }}
+            <span class="task-title">{{ conversation.title || '未命名对话' }}</span>
+            <span v-if="conversation.message_count" class="task-status completed">
+              {{ conversation.message_count }}条
             </span>
           </div>
           <div class="task-meta">
-            {{ formatDate(task.updatedAt) }}
+            {{ formatDate(conversation.updated_at) }}
           </div>
         </div>
 
-        <div v-if="tasks.length === 0" class="empty-state">
-          <p class="text-secondary">暂无任务</p>
-          <p class="text-tertiary">点击"新建任务"开始分析</p>
+        <div v-if="!loading && conversations.length === 0" class="empty-state">
+          <p class="text-secondary">暂无对话</p>
+          <p class="text-tertiary">点击"新建对话"开始</p>
         </div>
       </div>
     </div>
@@ -84,37 +85,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useTaskStore } from '@/stores/task'
-import type { Task } from '@/stores/task'
+import { ref, computed, onMounted } from 'vue'
+import { useConversationStore } from '@/stores/conversation'
+import type { Conversation } from '@/api/conversation'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const taskStore = useTaskStore()
+const conversationStore = useConversationStore()
 
 const isCollapsed = ref(false)
 
-const tasks = computed(() => taskStore.tasks)
-const currentTask = computed(() => taskStore.currentTask)
-
-const statusText: Record<Task['status'], string> = {
-  pending: '待处理',
-  processing: '分析中',
-  completed: '已完成',
-  error: '错误'
-}
+const conversations = computed(() => conversationStore.conversations)
+const currentConversation = computed(() => conversationStore.currentConversation)
+const loading = computed(() => conversationStore.loading)
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
 }
 
-const createNewTask = () => {
+const createNewConversation = () => {
   router.push({ name: 'Home' })
 }
 
-const selectTask = (task: Task) => {
-  taskStore.setCurrentTask(task)
-  router.push({ name: 'Task', params: { id: task.id } })
+const selectConversation = (conversation: Conversation) => {
+  conversationStore.setCurrentConversation(conversation)
+  router.push({ 
+    name: 'Task', 
+    params: { id: `conversation_${conversation.id}` },
+    query: { conversationId: conversation.id }
+  })
 }
 
 const formatDate = (dateString: string) => {
@@ -136,6 +135,15 @@ const formatDate = (dateString: string) => {
     })
   }
 }
+
+// 组件挂载时加载对话列表
+onMounted(async () => {
+  try {
+    await conversationStore.loadConversations()
+  } catch (error) {
+    console.error('加载对话列表失败:', error)
+  }
+})
 </script>
 
 <style scoped>
