@@ -41,11 +41,14 @@
 
     <div v-if="loading" class="panel loading-panel">
       <div class="panel__bd loading-state" role="status" aria-live="polite">
-        <div class="loading-orbit" aria-hidden="true"></div>
-        <div class="loading-text">正在加载对话...</div>
-        <div class="skeleton skeleton-line"></div>
-        <div class="skeleton skeleton-block"></div>
-        <div class="skeleton skeleton-block"></div>
+        <TechLoader
+          variant="inline"
+          mode="ring"
+          size="lg"
+          text="正在加载..."
+          :active="loading"
+          :showProgress="true"
+        />
       </div>
     </div>
 
@@ -337,6 +340,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
+import TechLoader from '@/components/TechLoader.vue'
 import { multiVideoApi, type MultiVideoResponse, type VideoInfo } from '@/api/multi_video'
 import { marked } from 'marked'
 
@@ -393,6 +397,35 @@ const searchingVideos = ref(false)
 // 选择的视频数量（默认5个，可以从URL参数中获取）
 const selectedVideoCount = ref<number>(5)
 
+// 视频列表持久化相关函数
+const STORAGE_KEY_PREFIX = 'conversation_videos_'
+
+// 保存视频列表到 localStorage
+const saveVideosToStorage = (convId: number | null, videos: VideoInfo[]) => {
+  if (!convId) return
+  try {
+    const key = `${STORAGE_KEY_PREFIX}${convId}`
+    localStorage.setItem(key, JSON.stringify(videos))
+  } catch (error) {
+    console.error('保存视频列表失败:', error)
+  }
+}
+
+// 从 localStorage 恢复视频列表
+const loadVideosFromStorage = (convId: number | null): VideoInfo[] => {
+  if (!convId) return []
+  try {
+    const key = `${STORAGE_KEY_PREFIX}${convId}`
+    const stored = localStorage.getItem(key)
+    if (stored) {
+      return JSON.parse(stored) as VideoInfo[]
+    }
+  } catch (error) {
+    console.error('加载视频列表失败:', error)
+  }
+  return []
+}
+
 const errorMessage = ref('')
 const composerRef = ref<HTMLTextAreaElement | null>(null)
 
@@ -425,6 +458,24 @@ watch(firstAnswer, () => {
     scrollToBottom()
   }
 })
+
+// 监听 conversationId 变化，恢复视频列表
+watch(conversationId, async (newId, oldId) => {
+  // 当切换对话时，恢复视频列表
+  if (newId && newId !== oldId) {
+    const savedVideos = loadVideosFromStorage(newId)
+    if (savedVideos.length > 0) {
+      currentVideos.value = savedVideos
+      console.log('从存储恢复视频列表:', savedVideos.length, '个视频')
+    } else {
+      // 如果没有保存的视频列表，清空当前列表
+      currentVideos.value = []
+    }
+  } else if (!newId) {
+    // 如果没有对话 ID，清空视频列表
+    currentVideos.value = []
+  }
+}, { immediate: true })
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return ''
@@ -730,6 +781,8 @@ const sendQuestion = async () => {
         prefetchedVideos = searchResult.video_urls || []
         prefetchedQuery = searchResult.search_query
         currentVideos.value = prefetchedVideos
+        // 保存视频列表到 localStorage
+        saveVideosToStorage(targetConversationId, prefetchedVideos)
       } catch (error) {
         console.error('视频搜索失败:', error)
       } finally {
@@ -756,6 +809,8 @@ const sendQuestion = async () => {
 
     if (response.video_urls && response.video_urls.length > 0 && currentVideos.value.length === 0) {
       currentVideos.value = response.video_urls
+      // 保存视频列表到 localStorage
+      saveVideosToStorage(targetConversationId, response.video_urls)
     }
 
     // 后端已经保存了用户消息和助手回复，直接重新加载对话即可
@@ -797,7 +852,16 @@ const handleDeleteConversation = async () => {
   
   deletingConversation.value = true
   try {
-    await conversationStore.deleteConversation(conversationId.value)
+    const idToDelete = conversationId.value
+    await conversationStore.deleteConversation(idToDelete)
+    
+    // 删除成功后，清理 localStorage 中的视频列表
+    try {
+      const key = `${STORAGE_KEY_PREFIX}${idToDelete}`
+      localStorage.removeItem(key)
+    } catch (error) {
+      console.error('清理视频列表存储失败:', error)
+    }
     
     // 删除成功后，跳转到首页或对话列表页
     router.push('/')
@@ -827,6 +891,12 @@ onMounted(async () => {
     loading.value = true
     try {
       await conversationStore.loadConversation(conversationId.value)
+      // 加载对话后，尝试恢复视频列表
+      const savedVideos = loadVideosFromStorage(conversationId.value)
+      if (savedVideos.length > 0) {
+        currentVideos.value = savedVideos
+        console.log('从存储恢复视频列表:', savedVideos.length, '个视频')
+      }
       // 加载后滚动到底部
       scrollToBottom()
       
@@ -852,7 +922,9 @@ onMounted(async () => {
       loading.value = false
     }
   } else {
-    // 如果没有 conversationId，尝试加载对话列表（用于显示历史对话）
+    // 如果没有 conversationId，清空视频列表
+    currentVideos.value = []
+    // 尝试加载对话列表（用于显示历史对话）
     try {
       await conversationStore.loadConversations(10, 0)
     } catch (error) {
@@ -982,7 +1054,9 @@ onMounted(async () => {
 .loading-state {
   display: grid;
   gap: 12px;
-  justify-items: start;
+  justify-items: center;
+  text-align: center;
+  min-height: 220px;
 }
 
 .loading-orbit {
@@ -1088,6 +1162,7 @@ onMounted(async () => {
   gap: 8px;
   max-height: calc(100vh - 660px);
   overflow-y: auto;
+
 }
 
 .video-item {
